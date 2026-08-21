@@ -410,6 +410,10 @@ footer .mark{font-family:'Limelight',cursive;font-size:16px;color:var(--brass);l
       <h3>The numbers are exact for these opponents.</h3>
       <p class="dim">The engine knows its players&rsquo; true ranges, which is true inside a simulator
         and only roughly true against people. The app says so on the page where it matters.</p>
+      <h3>What this page counts.</h3>
+      <p class="dim">Anonymous visit counts and how far people get in the trainer &mdash; nothing
+        about who you are, no account, no advertising, and no selling anything to anyone. If your
+        browser asks not to be tracked, it counts nothing at all.</p>
       <h3>Poker is beatable slowly, with swings that will test you.</h3>
       <p class="dim">Good players lose sessions constantly. What separates them is making
         positive-expectation decisions over and over. Make your expensive mistakes here first.</p>
@@ -482,5 +486,58 @@ footer .mark{font-family:'Limelight',cursive;font-size:16px;color:var(--brass);l
   }
   btns.forEach(function(b){ b.addEventListener("click", function(){ show(b.dataset.v); }); });
   show("nit");
+})();
+</script>
+
+<script>
+/* Landing-page analytics. Inert until ANALYTICS_KEY is filled in, honours Do
+   Not Track, and counts two things: that someone arrived, and that they went
+   through to the trainer. Nothing else. */
+(function(){
+  "use strict";
+  var ANALYTICS_KEY  = "";                              /* paste the project key to switch on */
+  var ANALYTICS_HOST = "https://eu.i.posthog.com";
+  var dnt = navigator.doNotTrack === "1" || window.doNotTrack === "1" ||
+            navigator.msDoNotTrack === "1";
+  if (!ANALYTICS_KEY || dnt) return;
+
+  function id(){
+    try {
+      var v = localStorage.getItem("mtr_did");
+      if (!v) { v = "d" + Math.random().toString(36).slice(2,10) +
+                        Math.random().toString(36).slice(2,6);
+                localStorage.setItem("mtr_did", v); }
+      return v;
+    } catch (e) { return "anon"; }
+  }
+  function send(name, props){
+    try {
+      var body = JSON.stringify({
+        api_key: ANALYTICS_KEY, event: name,
+        properties: Object.assign({ distinct_id: id(), $lib: "mtr-site" }, props || {}),
+        timestamp: new Date().toISOString()
+      });
+      var host = ANALYTICS_HOST;
+      if (host.charAt(host.length-1) === "/") host = host.slice(0, -1);
+      var url = host + "/i/v0/e/";
+      if (navigator.sendBeacon) navigator.sendBeacon(url, new Blob([body], {type:"text/plain"}));
+      else fetch(url, {method:"POST", body:body, keepalive:true,
+                       headers:{"Content-Type":"text/plain"}})["catch"](function(){});
+    } catch (e) {}
+  }
+  send("site_view", { ref: document.referrer ? new URL(document.referrer).hostname : "direct" });
+  var cta = document.querySelector(".btn");
+  if (cta) cta.addEventListener("click", function(){ send("cta_click", {}); });
+  /* did they actually read it, or bounce off the hero? */
+  var deep = false;
+  window.addEventListener("scroll", function(){
+    if (deep) return;
+    var pct = (window.scrollY + window.innerHeight) / document.body.scrollHeight;
+    if (pct > 0.6) { deep = true; send("read_deep", {}); }
+  }, { passive: true });
+  /* which opponent people click in the demo says which idea landed */
+  Array.prototype.forEach.call(document.querySelectorAll(".opp"), function(b){
+    b.addEventListener("click", function(){ send("demo_opponent", { who: b.dataset.v }); });
+  });
 })();
 </script>

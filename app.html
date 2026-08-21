@@ -2969,6 +2969,8 @@ $('#bStart').onclick = async ()=>{
   $('#startBar').style.display='none';
   sessionPre=[0,0]; sessionPost=[0,0]; sessionReads=[0,0]; sessionHands=0; STATS.sessions++;
   sessionReset(); brainReset(ST.brain===false?0:3);
+  trackSessionStart();
+  TRACK.track('play_start', {seats:G.seats.length, live:!!ST.live, stack_bb:ST.stackBB||100});
   await runHand();
 };
 $('#bNext').onclick = async ()=>{
@@ -3695,6 +3697,7 @@ const goPane = p => document.querySelector('nav .tab[data-pane="'+p+'"]').click(
 function campStart(i){
   if(campLv){ toast('Finish or abandon the current level first.'); return; }
   if(G.running){ toast('Finish the hand you are in first.'); return; }
+  TRACK.track('level_start', {level:CAMP[i].id, n:i+1, type:CAMP[i].type, chapter:CAMP[i].ch+1});
   const lv=CAMP[i]; campLv=lv; campSt={n:0, ok:0, hands:0, showdowns:0};
   if(lv.type==='drill'){
     drillMode=lv.mode; dRight=0; dTotal=0; dStreak=0;
@@ -3733,7 +3736,11 @@ function campEnd(win, lvIn){
     const after=levelsCleared();
     saveAll();
     const t0=titleFor(before), t1=titleFor(after);
-    if(t1.name!==t0.name) toast('\u2605 New rank: '+t1.name);
+    TRACK.track('level_complete', {level:lv.id, cleared:after, rank:t1.name});
+    if(t1.name!==t0.name){
+      TRACK.track('rank_earned', {rank:t1.name, cleared:after});
+      toast('\u2605 New rank: '+t1.name);
+    }
     else toast('✓ '+lv.id+' complete — '+lv.t);
     /* only bounce the user back if they are still looking at the table */
     setTimeout(()=>{
@@ -3746,6 +3753,7 @@ function campFail(msg, lvIn){
   const lv=lvIn||campLv;
   if(!lv){ campLv=null; dQ=null; campRestore(); return; }
   const i=CAMP.indexOf(lv); campLv=null; dQ=null; campRestore();
+  TRACK.track('level_failed', {level:lv.id, why:String(msg).slice(0,60)});
   const tr=$('#tracker'); tr.style.display='flex';
   tr.innerHTML=`<b style="color:var(--bad)">✗ ${lv.t}</b><span>${msg}</span>
     <button class="abtn quiet sm" id="cRetry">Retry</button>
@@ -4024,7 +4032,7 @@ function renderStats(){
      <div class="lvtitle" style="font-size:19px">rankings ${pct(d.rank[0],d.rank[1])} · showdown ${pct(d.winner[0],d.winner[1])}</div>
      <div class="lvgoal">open/fold ${pct(d.open[0],d.open[1])} · outs ${pct(d.outs[0],d.outs[1])}</div></div>`;
 }
-$('#leakBtn').onclick=openLeakReport;
+$('#leakBtn').onclick=()=>{ TRACK.track('leak_report_opened', {cleared:levelsCleared()}); openLeakReport(); };
 $('#resetStats').onclick=()=>{
   const sc=document.createElement('div');
   sc.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;display:flex;align-items:center;justify-content:center;padding:16px';
@@ -4037,7 +4045,9 @@ $('#resetStats').onclick=()=>{
   document.body.appendChild(sc);
   const go=keep=>{ const c=keep?STATS.campaign:{done:{}}; STATS=freshStats(); STATS.campaign=c;
     STATS.tilt=freshTilt(); STATS.leak=freshLeak();
-    if(!keep){ REGS={}; regsSave(); }
+    if(!keep){ REGS={}; regsSave();
+      /* a full reset clears the anonymous analytics id too */
+      try{ localStorage.removeItem('mtr_did'); localStorage.removeItem('mtr_visits'); }catch(e){} }
     saveAll(); renderStats(); renderCampaign(); sc.remove(); toast('Stats reset.'); };
   sc.querySelector('#rk').onclick=()=>go(true);
   sc.querySelector('#ra').onclick=()=>go(false);
@@ -4496,12 +4506,127 @@ function askRead(seat){
   });
 }
 
+/* =====================================================================
+   ANALYTICS
+   The only question worth answering right now is whether people come back
+   and how far they get. So this sends a small number of deliberate events
+   and nothing else — no autocapture, no session recording, no identifiers,
+   nothing typed, no card or hand data.
+
+   It stays completely inert until ANALYTICS.key is filled in, so the app
+   ships measuring nothing until that is a conscious decision.
+   ===================================================================== */
+const ANALYTICS = {
+  provider: 'posthog',      /* 'posthog' | 'plausible' | 'none' */
+  key: '',                  /* paste the project key here to switch it on */
+  host: 'https://eu.i.posthog.com',
+  debug: false              /* true = log events to the console instead of sending */
+};
+
+const TRACK = (() => {
+  let ready = false, queue = [], sent = 0;
+  const dnt = () => (navigator.doNotTrack==='1' || window.doNotTrack==='1' ||
+                     navigator.msDoNotTrack==='1');
+  const enabled = () => !!ANALYTICS.key && ANALYTICS.provider!=='none' && !dnt();
+
+  /* a stable, anonymous, per-device id. Not tied to a person, never sent
+     anywhere else, and wiped by the app's own stats reset. */
+  function deviceId(){
+    let v = null;
+    try { v = localStorage.getItem('mtr_did'); } catch(e){ return 'anon'; }
+    if(!v){
+      v = 'd' + Math.random().toString(36).slice(2,10) + Math.random().toString(36).slice(2,6);
+      try { localStorage.setItem('mtr_did', v); } catch(e){}
+    }
+    return v;
+  }
+  /* visit history is the retention signal, and it lives locally */
+  function visitInfo(){
+    let h = {first:null, visits:0, days:[]};
+    try { h = JSON.parse(localStorage.getItem('mtr_visits')||'null') || h; } catch(e){}
+    const today = new Date().toISOString().slice(0,10);
+    if(!h.first) h.first = today;
+    h.visits = (h.visits||0) + 1;
+    h.days = h.days || [];
+    if(h.days.indexOf(today) < 0) h.days.push(today);
+    if(h.days.length > 400) h.days = h.days.slice(-400);
+    try { localStorage.setItem('mtr_visits', JSON.stringify(h)); } catch(e){}
+    const dayOne = new Date(h.first + 'T00:00:00Z').getTime();
+    const now    = new Date(today   + 'T00:00:00Z').getTime();
+    return {visit: h.visits, distinctDays: h.days.length,
+            daysSinceFirst: Math.round((now-dayOne)/86400000),
+            returning: h.days.length > 1};
+  }
+
+  function send(name, props){
+    if(ANALYTICS.debug){ console.log('[track]', name, props); return; }
+    if(!enabled()) return;
+    sent++;
+    try{
+      if(ANALYTICS.provider==='posthog'){
+        const body = JSON.stringify({
+          api_key: ANALYTICS.key, event: name,
+          properties: Object.assign({distinct_id: deviceId(), $lib:'mtr'}, props),
+          timestamp: new Date().toISOString()
+        });
+        /* sendBeacon survives the tab closing, which is exactly when the
+           most valuable event (session_end) fires */
+        const url = ANALYTICS.host.replace(/\/$/,'') + '/i/v0/e/';
+        if(navigator.sendBeacon) navigator.sendBeacon(url, new Blob([body],{type:'text/plain'}));
+        else fetch(url,{method:'POST',body,keepalive:true,headers:{'Content-Type':'text/plain'}}).catch(()=>{});
+      } else if(ANALYTICS.provider==='plausible' && window.plausible){
+        window.plausible(name, {props: props});
+      }
+    }catch(e){ /* analytics must never break the app */ }
+  }
+
+  function track(name, props){
+    props = props || {};
+    if(!ready){ queue.push([name, props]); return; }
+    send(name, props);
+  }
+  function start(){
+    ready = true;
+    const v = visitInfo();
+    send('app_open', Object.assign({}, v));
+    queue.splice(0).forEach(([n,p]) => send(n, p));
+    return v;
+  }
+  return {track, start, visitInfo, enabled, get count(){ return sent; }};
+})();
+
+/* ---- the session summary: the single most informative event ---- */
+let SESSION_T0 = null;
+function trackSessionStart(){ SESSION_T0 = (window.performance && performance.now) ? performance.now() : 0; }
+function trackSessionEnd(reason){
+  if(SESSION_T0 === null || !SESSION.hands) return;
+  const mins = Math.round(((performance.now() - SESSION_T0)/60000)*10)/10;
+  TRACK.track('session_end', {
+    reason: reason || 'left',
+    hands: SESSION.hands,
+    minutes: mins,
+    preflop_pct: sessionPre[1] ? Math.round(100*sessionPre[0]/sessionPre[1]) : null,
+    exploit_pct: sessionPost[1] ? Math.round(100*sessionPost[0]/sessionPost[1]) : null,
+    exploit_n: sessionPost[1],
+    bb_given_up: G.bb ? Math.round(10*SESSION.evLost/G.bb)/10 : null,
+    levels_cleared: levelsCleared(),
+    rank: titleFor(levelsCleared()).name
+  });
+  SESSION_T0 = null;
+}
+window.addEventListener('pagehide', ()=>trackSessionEnd('left'));
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='hidden') trackSessionEnd('hidden');
+});
+
 /* ---------- boot ---------- */
 $('#introGo').onclick=()=>{
+  TRACK.track('intro_done', {});
   const ip=$('#intro'); ip.classList.add('leaving'); setTimeout(()=>ip.remove(),500);
 };
 seatTable(ST.seats); buildSeatEls(); renderAll();
 renderCampaign(); setTrigger('camp');
+TRACK.start();
 </script>
 <script>
 if('serviceWorker' in navigator &&
