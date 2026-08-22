@@ -1435,7 +1435,14 @@ function chen(a,b){
   const hi=Math.max(a.r,b.r), lo=Math.min(a.r,b.r);
   const pts=r=> r===14?10: r===13?8: r===12?7: r===11?6: r/2;
   let v = pts(hi);
-  if(hi===lo){ v = Math.max(5, v*2); return v; }
+  if(hi===lo){
+    /* The floor of 5 made 22/33/44/55 identical, so the sort that builds PF_PCT
+       separated them by push order - which runs high-to-low and therefore ranked
+       DEUCES above fives. A rank-sized tiebreak keeps the floor while ordering
+       them the right way round. */
+    v = Math.max(5, v*2) + hi*0.01;
+    return v;
+  }
   if(a.s===b.s) v += 2;
   const gap = hi-lo-1;
   v -= gap===0?0: gap===1?1: gap===2?2: gap===3?4:5;
@@ -3038,6 +3045,18 @@ function gradeHero(s, dec, L){
     if(R){
       const took = dec.a;
       const ok = took===R.should;
+      /* A spot inside the simulation's own margin of error is not a mistake,
+         whichever way it went. Show the numbers, score nothing. */
+      if(R.tooClose){
+        coach(el,'info', 'Too close to call — against '+V.name,
+          `Pot odds need <b>${Math.round(R.odds*100)}%</b> and against what ${V.name} would `+
+          `actually bet you have <b>${Math.round(R.eqReal*100)}%</b>. Calling is worth about `+
+          `<b>${R.evCall>=0?'+$':'-$'}${Math.abs(Math.round(R.evCall))}</b>, which is inside `+
+          `this simulation's own margin of error. Both answers are fine here, so this one is `+
+          `not scored.`);
+        campHook('post',{ok:true});
+        saveAll(); return;
+      }
       sessionPost[1]++; if(ok) sessionPost[0]++;
       STATS.exploit[1]++; if(ok) STATS.exploit[0]++;
       STATS.decisions[1]++; if(ok) STATS.decisions[0]++;
@@ -6004,6 +6023,14 @@ function equityVsWeighted(hero, board, weighted, iters){
   return (win+tie/2)/iters;
 }
 /* the dual baseline: pot odds, equity vs random, equity vs THIS player */
+/* How much of evCall is simulation noise rather than signal. eqReal is a Monte
+   Carlo estimate with standard error ~sqrt(0.25/iters), and evCall multiplies
+   that by (pot + toCall) - so on a big pot the noise is worth real money and a
+   verdict taken from the sign of evCall can flip run to run. */
+const EXPLOIT_ITERS = 1600;
+const evNoiseSd = (pot, toCall, iters) =>
+  (pot + toCall) * Math.sqrt(0.25 / (iters || EXPLOIT_ITERS));
+
 function exploitRead(hero, board, seat, toCall, pot){
   if(!seat || !seat.profile || board.length<3) return null;
   const odds = toCall/(pot+toCall);
@@ -6011,12 +6038,16 @@ function exploitRead(hero, board, seat, toCall, pot){
   /* replay the villain's OWN recorded decision context — never re-derive it,
      or the coach and the bot drift apart by exactly one barrel or one raise */
   const rng = villainBetRange(seat, hero, board, ctxFor(seat, board));
-  const eqReal = equityVsWeighted(hero, board, rng, 700);
+  const eqReal = equityVsWeighted(hero, board, rng, EXPLOIT_ITERS);
   if(eqReal==null) return null;
   const tot=rng.reduce((a,x)=>a+x.wt,0);
   const wide=rng.filter(x=>x.pct<0.45).reduce((a,x)=>a+x.wt,0)/tot;   /* share of their bets that are weak */
   const evCall = eqReal*pot - (1-eqReal)*toCall;
-  return {odds, eqRand, eqReal, evCall, bluffShare:wide,
+  /* Inside 1.5 standard errors of break-even, the sign of evCall is noise. The
+     app must not mark a player wrong for choosing the other side of a coin. */
+  const sd = evNoiseSd(pot, toCall, EXPLOIT_ITERS);
+  const tooClose = Math.abs(evCall) < sd * 1.5;
+  return {odds, eqRand, eqReal, evCall, bluffShare:wide, tooClose, sd,
           should: evCall>0 ? 'call' : 'fold', profile:seat.profile,
           snap: rangeSnapshot(seat, hero, board, rng)};
 }
