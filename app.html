@@ -211,6 +211,36 @@ nav{display:flex;gap:6px;flex-wrap:wrap;padding:6px 0 16px;align-items:center}
 .imgchip{font-size:11px;letter-spacing:.05em;border:1px solid var(--brass);color:var(--brass-hi);
   background:rgba(200,145,47,.10);border-radius:99px;padding:2px 10px}
 .imgchip small{color:var(--dim);letter-spacing:0}
+button.imgchip{cursor:pointer;font-family:inherit;text-align:left}
+button.imgchip:hover{background:rgba(200,145,47,.20)}
+button.imgchip .more{opacity:.75;margin-left:6px}
+
+/* how they see you */
+.hsy-lead{font-size:14.5px;line-height:1.6;color:#CFD6D1;margin:0 0 14px}
+
+/* the set: a declared number of hands, counted down in the pill row */
+.setpick{display:flex;gap:9px;flex-wrap:wrap;justify-content:center;margin:2px 0 4px}
+.setpick .abtn{min-width:78px}
+.setq{font-size:12.5px;color:var(--dim);text-align:center;margin-bottom:7px;
+  letter-spacing:.04em;text-transform:uppercase}
+.pill.set b{font-variant-numeric:tabular-nums}
+.pill.set.close{border-color:var(--brass);color:var(--brass-hi);
+  background:rgba(200,145,47,.14)}
+.hsy-me{border:1px solid var(--brass);border-radius:11px;padding:13px 15px;margin-bottom:16px;
+  background:linear-gradient(180deg,rgba(200,145,47,.14),rgba(200,145,47,.04))}
+.hsy-me .lab{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--brass)}
+.hsy-me .who{font-size:18px;font-weight:800;margin:3px 0 2px}
+.hsy-me .num{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+.hsy-me .exp{font-size:14px;line-height:1.6;color:#CFD6D1;margin-top:9px}
+.hsy-row{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);
+  border-radius:11px;padding:12px 14px;margin-bottom:9px;background:rgba(0,0,0,.2)}
+.hsy-row .nm{font-weight:800;font-size:15px;min-width:88px}
+.hsy-row .nm small{display:block;font-weight:400;font-size:11px;color:var(--dim);
+  letter-spacing:0;font-variant-numeric:tabular-nums}
+.hsy-row .bd{font-size:13.5px;line-height:1.55;color:#CFD6D1}
+.hsy-row .bd b{color:var(--brass-hi)}
+.hsy-row .ctr{display:block;margin-top:4px;color:var(--good);font-size:13px}
+.hsy-row.cold .bd{color:var(--dim)}
 .leak-card{display:flex;gap:12px;border:1px solid var(--line);border-radius:11px;
   padding:13px;margin-bottom:10px;background:rgba(0,0,0,.16)}
 .leak-rank{font-family:'Limelight',cursive;font-size:26px;color:var(--brass);line-height:1;min-width:26px}
@@ -310,12 +340,21 @@ nav{display:flex;gap:6px;flex-wrap:wrap;padding:6px 0 16px;align-items:center}
   border-radius:99px;background:rgba(255,255,255,.14);overflow:hidden}
 .think b{display:block;height:100%;width:0;background:var(--brass);border-radius:99px}
 
+/* the key that does the same thing, for the hands that already know */
+.kx{
+  display:inline-block; margin-left:7px; padding:1px 5px; border-radius:4px;
+  font-size:10px; font-weight:700; letter-spacing:.06em; vertical-align:2px;
+  background:rgba(0,0,0,.22); color:inherit; opacity:.5;
+}
+@media (pointer:coarse){ .kx{display:none} }   /* no keyboard, no hint */
+
 /* ---------- action bar ---------- */
 .actbar{display:flex;gap:9px;flex-wrap:wrap;justify-content:center;align-items:center}
 .abtn{
   border:none;border-radius:9px;padding:13px 22px;font-size:15px;font-weight:800;letter-spacing:.05em;
   font-family:'Archivo',system-ui,sans-serif;text-transform:uppercase;
   background:var(--ivory);color:var(--ink);box-shadow:0 4px 0 rgba(0,0,0,.4);min-width:92px;
+  touch-action:manipulation;   /* no held tap waiting to become a zoom gesture */
   transition:transform .08s,box-shadow .08s;
 }
 .abtn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.4)}
@@ -647,27 +686,35 @@ footer{margin-top:26px;text-align:center;font-size:12px;color:var(--dim);opacity
     </div>
 
     <div class="actbar" id="actBar" style="display:none">
-      <button class="abtn danger" id="bFold">Fold</button>
-      <button class="abtn" id="bCheck">Check</button>
+      <button class="abtn danger" id="bFold">Fold<span class="kx">F</span></button>
+      <button class="abtn" id="bCheck">Check<span class="kx">C</span></button>
       <button class="abtn" id="bCall">Call</button>
-      <button class="abtn gold" id="bBet">Bet</button>
+      <button class="abtn gold" id="bBet">Bet<span class="kx">B</span></button>
       <button class="abtn quiet" id="brainBtn" title="Ask what a strong player would think here">&#129504; Think</button>
     </div>
     <div class="sizerow" id="sizeRow" style="display:none">
-      <button class="abtn quiet sm" data-frac="0.33">⅓ pot</button>
-      <button class="abtn quiet sm" data-frac="0.5">½ pot</button>
-      <button class="abtn quiet sm" data-frac="0.75">¾ pot</button>
-      <button class="abtn quiet sm" data-frac="1">Pot</button>
-      <button class="abtn quiet sm" data-frac="99">All in</button>
+      <button class="abtn quiet sm" data-frac="0.33">⅓ pot<span class="kx">1</span></button>
+      <button class="abtn quiet sm" data-frac="0.5">½ pot<span class="kx">2</span></button>
+      <button class="abtn quiet sm" data-frac="0.75">¾ pot<span class="kx">3</span></button>
+      <button class="abtn quiet sm" data-frac="1">Pot<span class="kx">4</span></button>
+      <button class="abtn quiet sm" data-frac="99">All in<span class="kx">A</span></button>
       <input type="range" id="betSlider" min="0" max="100" value="50">
       <span class="amt" id="betAmt">0</span>
     </div>
     <div class="actbar" id="nextBar" style="display:none">
-      <button class="abtn gold" id="bNext">Next hand</button>
+      <button class="abtn gold" id="bNext">Next hand<span class="kx">⏎</span></button>
+      <button class="abtn quiet" id="bWhatIf" style="display:none">What if?<span class="kx">W</span></button>
       <button class="abtn quiet" id="bEndSession">End session</button>
     </div>
-    <div class="actbar" id="startBar">
-      <button class="abtn gold" id="bStart">Deal in</button>
+    <div id="startBar">
+      <div class="setq" id="setQ">How many hands?</div>
+      <div class="setpick" id="setPick">
+        <button class="abtn quiet sm" data-set="20">20</button>
+        <button class="abtn quiet sm" data-set="40">40</button>
+        <button class="abtn quiet sm" data-set="75">75</button>
+        <button class="abtn quiet sm" data-set="0">Just play</button>
+      </div>
+      <div class="actbar"><button class="abtn gold" id="bStart">Deal in</button></div>
     </div>
     <div class="imgmeter" id="imgMeter"></div>
     <div id="callBar">
@@ -2098,6 +2145,33 @@ const activeSeats = () => G.seats.filter(s=>!s.folded);
 const canActSeats = () => G.seats.filter(s=>!s.folded && !s.allIn);
 const T = ms => Math.max(10, ms/(ST.speed||1)/(window._turbo||1));
 
+/* Two kinds of pause, deliberately separated.
+
+   BEAT carries information - a card landing, chips moving, the held moment
+   before a verdict. These stay legible and are NOT what the speed control is
+   for. PACE is the app waiting between things that already happened; it is
+   pure cost. A single multiplier over both was compressing the informative
+   half to buy back time from the wasteful half. */
+const BEAT = { handStart:340, deal:460, settle:380 };
+const PACE = { afterAct:200, afterFold:90, foldRun:150, heroAct:120 };
+
+/* A tank reads as a tank because of what it is longer THAN, not because of how
+   long it is. Measured: seven slow thinks a hand at 900-1800ms was four and a
+   half seconds of a twelve-second hand. Snapping 300-520 against tanking
+   640-1250 keeps the same 2.4x contrast for a third less time. */
+const THINK = { snapLo:300, snapVar:220, slowLo:640, slowVar:610 };
+
+/* Once the hero is out of the pot nobody is reading anybody and nobody is being
+   graded, so the hand plays as a montage rather than a movie. Everything still
+   happens in order and on screen - watching a pot you folded is how the reads
+   get built - it just stops costing a full hand's worth of time. */
+const OUT_OF_HAND = 0.34;
+function watching(){
+  const hs = G.seats && G.seats[G.heroIdx];
+  return !!(hs && hs.folded);
+}
+const mont = ms => watching() ? Math.max(60, ms*OUT_OF_HAND) : ms;
+
 /* The cast you actually play against. One per family first so the reads stay
    varied, then filled to ten. Persisted, because a regular you never see twice
    is not a regular. */
@@ -2469,11 +2543,34 @@ function regsRemember(){
     const r=s.reg;
     r.hands += 1;          /* regsRemember already runs once per hand per seat */
     /* blend the new read into the old one, weighted by how much they saw */
+    const was = regBelief(r) && regBelief(r).sees;
     if(fold!=null) r.memFold = r.memFold==null ? fold : r.memFold*0.6 + fold*0.4;
     if(aggr!=null) r.memAggr = r.memAggr==null ? aggr : r.memAggr*0.6 + aggr*0.4;
+    /* The instant a regular's read hardens is the instant your equity against
+       him moved, and it is the one thing worth interrupting for. Once per
+       regular per session - after that he simply believes it. */
+    const now = regBelief(r);
+    if(now && now.sees !== was && r.hands >= 12){
+      IMAGE_TOLD = IMAGE_TOLD || {};
+      if(!IMAGE_TOLD[r.id]){
+        IMAGE_TOLD[r.id] = true;
+        IMAGE_NEWS.push({name:r.name||r.id, sees:now.sees, ctr:now.ctr});
+      }
+    }
   });
   regsSave();
 }
+let IMAGE_TOLD = null;          /* one notice per regular per session */
+const IMAGE_NEWS = [];         /* crossings waiting for a safe moment to show */
+
+/* Shown between hands only. Never while the hero is deciding - the whole point
+   is that it changes the NEXT decision, not that it distracts from this one. */
+function flushImageNews(){
+  if(!IMAGE_NEWS.length || G.heroDeciding) return;
+  const n = IMAGE_NEWS.shift();
+  toast(`${n.name} has you figured: he thinks ${n.sees}. ${n.ctr}`, 5600);
+}
+
 function regGreeting(){
   const known=G.seats.filter(s=>!s.isHero && s.reg && s.reg.hands>=10);
   if(!known.length) return '';
@@ -2546,6 +2643,9 @@ function renderAll(){
     (sessionPre[1] ? `<span class="pill">Preflop <b>${sessionPre[0]}/${sessionPre[1]}</b></span>` : '') +
     (sessionPost[1] ? `<span class="pill gold">Exploit <b>${sessionPost[0]}/${sessionPost[1]}</b></span>` : '') +
     (SESSION.hands ? `<span class="pill">Given up <b>${(SESSION.evLost/G.bb).toFixed(1)}bb</b></span>` : '') +
+    (SESSION.target
+       ? `<span class="pill set${(SESSION.target-SESSION.hands)<=3?' close':''}">Set <b>${
+           Math.min(SESSION.hands,SESSION.target)}/${SESSION.target}</b></span>` : '') +
     (HIST.length ? `<span class="pill" id="pillReview" style="cursor:pointer">Review hands \u25b8</span>` : '');
   renderSessionPills();     /* innerHTML above just destroyed the old handler */
 }
@@ -2561,6 +2661,25 @@ function showThink(s, ms){
   }catch(e){}
   setTimeout(()=>{ if(d.parentNode) d.remove(); }, T(ms)+120);
 }
+/* Quiet on a clean hand, gold and priced when the hand cost something. The
+   threshold is a tenth of a big blind, which is below anything a player would
+   feel and above the rounding noise in the EV estimates. */
+function renderWhatIf(){
+  const b=$('#bWhatIf'); if(!b) return;
+  const hand = HIST[HIST.length-1];
+  if(!hand || !hand.acts || !hand.acts.length){ b.style.display='none'; return; }
+  const lost = hand.evLost||0;
+  const worth = lost >= (G.bb||2)*0.1;
+  b.style.display='';
+  b.className = 'abtn ' + (worth ? 'gold' : 'quiet');
+  b.innerHTML = (worth ? 'What if? \u00b7 cost $'+Math.round(lost) : 'What if?')
+              + '<span class="kx">W</span>';
+  b.onclick = ()=>{
+    openReplayer(HIST.length-1, worstStep(hand));
+    TRACK.track('whatif_opened', {ev_lost:Math.round(lost), from:'nextbar'});
+  };
+}
+
 function renderSessionPills(){
   const p=$('#pillReview');
   if(p) p.onclick=()=>openReplayer(HIST.length-1);
@@ -2744,6 +2863,64 @@ function callableSpot(s, L){
   return true;
 }
 
+/* =====================================================================
+   THE KEYBOARD
+
+   Every binding resolves to a real on-screen control and then clicks it. A
+   hidden or disabled button is a no-op for the mouse and therefore a no-op for
+   the key - there is no parallel path into the hand loop that could fire on a
+   spot the mouse could not reach.
+   ===================================================================== */
+const SZ = f => '#sizeRow [data-frac="'+f+'"]';
+const KEYS = {
+  f:'#bFold', c:'#bCheck|#bCall', b:'#bBet', a:SZ(99), w:'#bWhatIf',
+  '1':SZ(0.33), '2':SZ(0.5), '3':SZ(0.75), '4':SZ(1)
+};
+
+function pressable(sel){
+  for(const one of sel.split('|')){
+    const el = document.querySelector(one);
+    if(el && el.offsetParent !== null && !el.disabled) return el;
+  }
+  return null;
+}
+
+/* Typing in a field means typing, not folding. */
+function typing(){
+  const a = document.activeElement;
+  return !!(a && (a.tagName==='INPUT' || a.tagName==='TEXTAREA' || a.isContentEditable));
+}
+
+document.addEventListener('keydown', e => {
+  if(e.metaKey || e.ctrlKey || e.altKey || typing()) return;
+  const k = e.key.toLowerCase();
+
+  /* the read prompt owns the number row while it is open */
+  const callBar = document.querySelector('#callBar');
+  if(callBar && callBar.style.display === 'flex'){
+    const i = {'1':0, '2':1, '3':2}[k];
+    const opts = document.querySelectorAll('#callOpts button');
+    if(i !== undefined && opts[i]){ e.preventDefault(); opts[i].click(); }
+    return;
+  }
+
+  if(k === 'enter' || k === ' '){
+    /* Enter continues; Space is the safe default action, which is whichever of
+       check or call is on the table. Neither ever folds - a misfired space bar
+       must not throw a hand away. */
+    const nx = pressable('#bNext');
+    if(k === 'enter' && nx){ e.preventDefault(); nx.click(); return; }
+    const safe = pressable('#bCheck|#bCall');
+    if(safe){ e.preventDefault(); safe.click(); }
+    return;
+  }
+
+  const sel = KEYS[k];
+  if(!sel) return;
+  const el = pressable(sel);
+  if(el){ e.preventDefault(); el.click(); }
+});
+
 function askCallIt(s, L){
   return new Promise(done=>{
     if(!callableSpot(s, L)){ G.calledIt=null; done(); return; }
@@ -2755,9 +2932,10 @@ function askCallIt(s, L){
     $('#callQ').innerHTML=`<b>${V.name}</b> bets. Before you act &mdash; against the hands
       <i>he</i> would be betting here, where does your hand stand?`;
     opts.innerHTML='';
-    ['ahead','marginal','behind'].forEach(k=>{
+    ['ahead','marginal','behind'].forEach((k,i)=>{
       const b=document.createElement('button');
-      b.className='abtn quiet'; b.textContent=CALL_LABEL[k];
+      b.className='abtn quiet';
+      b.innerHTML = CALL_LABEL[k] + '<span class="kx">'+(i+1)+'</span>';
       b.onclick=()=>{ G.calledIt={said:k, villain:V.name}; close(); };
       opts.appendChild(b);
     });
@@ -2779,10 +2957,11 @@ function heroAction(s){
     $('#startBar').style.display='none';
     $('#bCheck').style.display = L.canCheck?'':'none';
     $('#bCall').style.display  = L.canCall?'':'none';
-    $('#bCall').textContent = 'Call $'+L.toCall;
+    $('#bCall').innerHTML = 'Call $'+L.toCall+'<span class="kx">C</span>';
     $('#bBet').style.display = L.canBet?'':'none';
-    $('#bBet').textContent = (L.maxBetTo <= L.minBetTo) ? 'All in'
-                           : G.currentBet>0 ? 'Raise' : 'Bet';
+    $('#bBet').innerHTML = ((L.maxBetTo <= L.minBetTo) ? 'All in'
+                           : G.currentBet>0 ? 'Raise' : 'Bet')
+                           + '<span class="kx">B</span>';
     const sr=$('#sizeRow'); sr.style.display = L.canBet?'flex':'none';
     const sl=$('#betSlider');
     sl.min=L.minBetTo; sl.max=L.maxBetTo;
@@ -3449,13 +3628,83 @@ function heroImage(){
   return {fam, label:FAM(fam).label, vpip, pfr, f2b, expects, n, firm,
           nearest:ranked[0].f, second:ranked[1].f, margin};
 }
+/* What one regular believes about the hero, what they do about it, and the
+   counter. Keyed on the same two numbers refreshProfiles actually reads, so the
+   text can never describe an adjustment nobody is making. */
+function regBelief(r){
+  const F=r.memFold, A=r.memAggr;
+  if(F!=null && F>0.60) return {
+    sees:'you fold to most bets',
+    does:'so he bets at you more often with nothing',
+    ctr :'Call him down lighter, or raise him.'};
+  if(F!=null && F<0.30) return {
+    sees:'you almost never fold',
+    does:'so he has stopped bluffing and value bets thinner',
+    ctr :'Believe his bets. Stop paying him off.'};
+  if(A!=null && A<0.18) return {
+    sees:'you rarely bet',
+    does:'so he takes the pot whenever nobody has anything',
+    ctr :'Bet more. Those pots are free.'};
+  if(A!=null && A>0.55) return {
+    sees:'you bet a lot',
+    does:'so he calls you down with weaker hands',
+    ctr :'Keep value betting, cut the bluffs.'};
+  return null;
+}
+
+function openHowTheySeeYou(){
+  closeSheet();
+  const im = heroImage();
+  const regs = Object.keys(REGS).map(k=>REGS[k])
+    .filter(r=>r && r.hands>=6)
+    .sort((a,b)=>b.hands-a.hands)
+    .slice(0,10);
+
+  const rows = regs.map(r=>{
+    const b=regBelief(r);
+    const nm=`<div class="nm">${r.name||r.id}<small>${r.hands} hands together</small></div>`;
+    if(!b) return `<div class="hsy-row cold">${nm}<div class="bd">Has not found an angle on you yet.
+      Nothing you do stands out to him.</div></div>`;
+    return `<div class="hsy-row">${nm}<div class="bd">Thinks <b>${b.sees}</b>, ${b.does}.
+      <span class="ctr">\u2192 ${b.ctr}</span></div></div>`;
+  }).join('');
+
+  const sheet=document.createElement('div'); sheet.className='sheet';
+  sheet.innerHTML=`<div class="sheet-in" style="max-width:620px">
+    <div class="sheet-h"><div class="sheet-t">How they see you</div>
+      <button class="abtn quiet sm" id="hsyX">Close</button></div>
+    <p class="hsy-lead">You spend every hand building a read on them. This is the same
+      thing pointed the other way &mdash; and unlike most trainers, they really do play
+      differently because of it.</p>
+    ${im ? `<div class="hsy-me">
+      <div class="lab">At this table, right now</div>
+      <div class="who">${im.label}${im.firm?'':' <span style="font-size:12px;opacity:.7">(still forming)</span>'}</div>
+      <div class="num">${im.vpip}/${im.pfr}${im.f2b!=null?' \u00b7 folds to '+im.f2b+'% of bets':''}
+        \u00b7 ${im.n} hand${im.n===1?'':'s'}</div>
+      <div class="exp">${im.expects}</div>
+    </div>` : `<p class="hsy-lead">Play a few more hands and the table will start to
+      form a view of you.</p>`}
+    ${regs.length
+      ? `<div class="lab" style="font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;
+           color:var(--brass);margin:0 0 8px">The regulars remember</div>${rows}`
+      : `<p class="hsy-lead" style="margin-bottom:0">None of these players has enough history
+         with you yet. Their memory carries across sessions, so it builds up.</p>`}
+  </div>`;
+  document.body.appendChild(sheet);
+  sheet.querySelector('#hsyX').onclick=()=>sheet.remove();
+  sheet.addEventListener('click', e=>{ if(e.target===sheet) sheet.remove(); });
+  TRACK.track('image_opened', {regs:regs.length, hands:im?im.n:0});
+}
+
 function renderImageMeter(){
   const z=$('#imgMeter'); if(!z) return;
   const im=heroImage();
   if(!im || !ST.image){ z.innerHTML=''; return; }
-  z.innerHTML = `<span class="imgchip">TABLE SEES YOU AS: <b>${im.label}</b>${im.firm?'':' <small>(still forming)</small>'}
-    <small>&nbsp;${im.vpip}/${im.pfr}${im.f2b!=null?' \u00b7 folds '+im.f2b+'%':''} over just ${im.n} hands</small></span>`;
-  z.title = im.expects;
+  /* a button, not a chip - the paragraph behind it is the most useful text in
+     the app and it used to live in a title attribute nobody could reach */
+  z.innerHTML = `<button class="imgchip" id="imgOpen">TABLE SEES YOU AS: <b>${im.label}</b>${im.firm?'':' <small>(still forming)</small>'}
+    <small>&nbsp;${im.vpip}/${im.pfr}${im.f2b!=null?' \u00b7 folds '+im.f2b+'%':''} over just ${im.n} hands</small><span class="more">\u203a</span></button>`;
+  const ob=$('#imgOpen'); if(ob) ob.onclick=openHowTheySeeYou;
 }
 
 /* ---------- the coach ---------- */
@@ -3801,8 +4050,8 @@ function histEnd(result){
   G.log = null;
 }
 /* session totals, reset when you sit down */
-let SESSION = {hands:0, evLost:0, net:0, started:null, tilt:[]};
-function sessionReset(){ SESSION={hands:0, evLost:0, net:0, started:Date.now?0:0, tilt:[]}; HIST=[]; }
+let SESSION = {hands:0, evLost:0, net:0, started:null, tilt:[], target:null};
+function sessionReset(){ SESSION={hands:0, evLost:0, net:0, started:Date.now?0:0, tilt:[], target:ST.setSize||null}; HIST=[]; }
 
 /* ---------- flow ---------- */
 function dealBoard(street){
@@ -3816,6 +4065,7 @@ function nextToAct(from){
   return -1;
 }
 async function bettingRound(){
+  let foldRun = 0;          /* consecutive folds, so a run resolves as one sweep */
   let idx=firstToAct(), guard=0;
   while(idx>=0 && guard++<80){
     if(activeSeats().length<=1) break;
@@ -3846,7 +4096,15 @@ async function bettingRound(){
       const snap = dec.a==='fold' || (dec.a==='check' && !facing);
       let slow = !snap;
       if(Math.random() < 0.25) slow = !slow;              /* the false signal */
-      const ms = slow ? 900+Math.random()*900 : 360+Math.random()*260;
+      let ms = slow ? THINK.slowLo+Math.random()*THINK.slowVar
+                    : THINK.snapLo+Math.random()*THINK.snapVar;
+      /* A run of folds is one event, not five. After the first, the rest sweep
+         past - preflop folding around to the hero used to cost several seconds
+         of watching nothing happen. Never applied to a bet, call or raise:
+         their timing IS the tell, and the app grades the player on reading it. */
+      if(dec.a==='fold' && !slow && foldRun > 0) ms = PACE.foldRun + Math.random()*70;
+      foldRun = dec.a==='fold' ? foldRun+1 : 0;
+      ms = mont(ms);
       s.tank = slow;
       if(ST.timing) showThink(s, ms);
       await sleep(T(ms));
@@ -3873,7 +4131,8 @@ async function bettingRound(){
       if(la.a==='call') la.toCall = Math.min(toCallNow, s.bet);
     }
     renderAll();
-    await sleep(T(240));
+    /* nothing more to look at once a player is out of the hand */
+    await sleep(T(mont(dec.a==='fold' ? PACE.afterFold : PACE.afterAct)));
     idx = nextToAct(idx);
   }
   G.acting=-1; renderAll();
@@ -3882,13 +4141,14 @@ async function runHand(){
   G.running=true;
   startHand(); histStart(); buildSeatEls(); renderAll();
   coachHide($('#playCoach'));
-  await sleep(T(380));
+  await sleep(T(BEAT.handStart));
   for(let street=0; street<4; street++){
     G.street=street;
     if(street>0){
       G.seats.forEach(s=>{ s.bet=0; s.acted=false; s.lastAct=''; s.checkedThisStreet=false; s.ctx=null; });
       G.currentBet=0; G.lastRaise=G.bb; G.raisesThisStreet=0;
-      dealBoard(street); SFX.play('card'); renderAll(); await sleep(T(480));
+      /* the board landing is information - this one does not get cut */
+      dealBoard(street); SFX.play('card'); renderAll(); await sleep(T(mont(BEAT.deal)));
     }
     if(activeSeats().length>1 && canActSeats().length>1) await bettingRound();
     if(activeSeats().length<=1) break;
@@ -3913,7 +4173,8 @@ async function settle(){
   /* only once the cards are legitimately face-up may the reveal name them */
   if(G.lastRead && G.lastRead.villainSeat && G.lastRead.villainSeat.reveal)
     G.lastRead.villainHole = (G.lastRead.villainSeat.hole||[]).slice();
-  renderAll(); await sleep(T(400));
+  renderAll(); await sleep(T(BEAT.settle));
+  flushImageNews();
   const heroSeat=G.seats[G.heroIdx];
   const before=heroSeat.stack;
   awardPots();
@@ -3958,11 +4219,42 @@ async function settle(){
            winners:(live.length===1?[live[0].name]
                     :live.filter(s=>s.wonAmt>0).map(s=>s.name))});
   G.running=false; G.acting=-1; renderAll();
+  /* The set landing is the whole point: the session ends on a completion rather
+     than on fatigue, and the debrief arrives as the reward for finishing rather
+     than as an interruption. A campaign level and a read round each run their
+     own ending, so a set never fires underneath one. */
+  if(SESSION.target && SESSION.hands >= SESSION.target && !campLv && !RDMODE){
+    $('#nextBar').style.display='none';
+    renderSessionPills();
+    saveAll();
+    trackSessionEnd('set_complete');
+    saveSessionSnapshot();
+    const R = sessionReport();
+    if(R) R.setDone = SESSION.target;
+    openSessionReport(R && R.hands ? R : undefined);
+    $('#startBar').style.display='';
+    campHook('hand',{});
+    return;
+  }
   $('#nextBar').style.display='flex';
+  renderWhatIf();
   renderSessionPills();
   saveAll();
   campHook('hand',{});
 }
+/* twenty hands is four or five minutes, which is the honest answer to "how
+   long does this take" and therefore the one that decides whether the app gets
+   opened on a weeknight */
+if(ST.setSize===undefined) ST.setSize = 20;
+function renderSetPick(){
+  $$('#setPick [data-set]').forEach(b=>{
+    const v=+b.dataset.set;
+    b.className = 'abtn sm ' + (v===(ST.setSize||0) ? 'gold' : 'quiet');
+    b.onclick = ()=>{ ST.setSize = v || null; saveAll(); renderSetPick(); };
+  });
+}
+renderSetPick();
+
 $('#bStart').onclick = async ()=>{
   if(!G.seats.length) seatTable(ST.seats);
   regsSeat();
@@ -3988,7 +4280,7 @@ $('#bEndSession').onclick = ()=>{
   saveSessionSnapshot();
   openSessionReport();
   $('#nextBar').style.display='none';
-  $('#startBar').style.display='flex';
+  $('#startBar').style.display='';
 };
 $('#bNext').onclick = async ()=>{
   $('#nextBar').style.display='none';
@@ -4003,11 +4295,26 @@ $('#bNext').onclick = async ()=>{
 let RP = {i:0, step:0};
 const cardOf = c => ({r:c.r, s:c.s});
 function closeSheet(){ $$('.sheet').forEach(e=>e.remove()); }
-function openReplayer(idx){
+function openReplayer(idx, step){
   if(!HIST.length) return;
   RP.i = Math.max(0, Math.min(HIST.length-1, idx));
-  RP.step = 0;
+  const acts = (HIST[RP.i].acts||[]).length;
+  RP.step = Math.max(0, Math.min(Math.max(0,acts-1), step||0));
   drawReplayer();
+}
+
+/* The action a hand actually turned on: the hero decision with the largest
+   honest EV loss. Decisions carry actIdx - the index the action took in the
+   log - so the replayer can be opened standing on it. */
+function worstStep(hand){
+  if(!hand || !hand.decisions || !hand.decisions.length) return 0;
+  let best=null;
+  hand.decisions.forEach(d=>{
+    if(d.evLost==null || !(d.evLost>0)) return;
+    if(!best || d.evLost>best.evLost) best=d;
+  });
+  if(!best || best.actIdx==null) return 0;
+  return Math.max(0, best.actIdx-1);     /* the action itself, not the one after */
 }
 function boardAt(hand, step){
   const a = hand.acts[Math.min(step, hand.acts.length-1)];
@@ -5320,7 +5627,8 @@ function openSessionReport(snap){
   sheet.innerHTML=`<div class="sheet-in">
     <div class="sheet-h">
       <div>
-        <div class="deb-head">${R.stale?'Your last session':'How that session went'}</div>
+        <div class="deb-head">${R.setDone ? 'Set complete \u2014 '+R.setDone+' hands'
+          : R.stale?'Your last session':'How that session went'}</div>
         <div class="deb-sub">${R.hands} hand${R.hands===1?'':'s'} &middot; graded on decisions, never on results</div>
       </div>
       <button class="abtn quiet sm" id="dbClose">Close</button>
@@ -5623,9 +5931,9 @@ function renderCampaign(){
   $$('#campList [data-camp]').forEach(b=> b.onclick=()=>campStart(+b.dataset.camp));
   $$('#campList [data-brief]').forEach(b=> b.onclick=()=>openBrief(+b.dataset.brief, null));
 }
-function toast(msg){
+function toast(msg, ms){
   const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
-  document.body.appendChild(t); setTimeout(()=>t.remove(),3600);
+  document.body.appendChild(t); setTimeout(()=>t.remove(), ms||3600);
 }
 
 /* =====================================================================
