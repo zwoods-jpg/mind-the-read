@@ -236,7 +236,7 @@ footer .mark{font-family:'Limelight',cursive;font-size:16px;color:var(--brass);l
       <div class="readout">
         <div class="verdict">
           <span class="vword fold" id="vWord">FOLD</span>
-          <span class="vev num" id="vEv">&minus;$11 if you call</span>
+          <span class="vev num" id="vEv">&minus;$28 if you call</span>
         </div>
         <div class="bars">
           <div class="bar">
@@ -250,13 +250,13 @@ footer .mark{font-family:'Limelight',cursive;font-size:16px;color:var(--brass);l
             <em class="num">53%</em>
           </div>
           <div class="bar">
-            <span>vs <span id="vName">Walter</span></span>
-            <div class="track"><div class="fill real" id="vFill" style="width:31%"></div></div>
-            <em class="num" id="vEq">31%</em>
+            <span>vs <span id="vName">Ingrid</span></span>
+            <div class="track"><div class="fill real" id="vFill" style="width:27%"></div></div>
+            <em class="num" id="vEq">27%</em>
           </div>
         </div>
-        <p class="tell" id="vTell"><b>Walter waits all night for aces and folds everything else.</b>
-          When he finally bets, almost none of it is air.</p>
+        <p class="tell" id="vTell"><b>Ingrid opens about one hand an orbit and checks back every flop she missed.</b>
+          When she finally bets, almost none of it is air.</p>
       </div>
     </div>
   </div>
@@ -272,9 +272,10 @@ footer .mark{font-family:'Limelight',cursive;font-size:16px;color:var(--brass);l
       They lose because they can&rsquo;t read the person across the table and adjust. And at the
       stakes most people actually play, the table is full of opponents making enormous,
       repeatable, obvious mistakes &mdash; mistakes a balanced strategy politely declines to punish.</p>
-    <p class="dim">There is a second gap nobody fills. Live games run straddles, everyone limps,
-      and pots go four ways. Solvers barely address multiway play, so the players who study
-      hardest online can still look lost in a cardroom.</p>
+    <p class="dim">There is a second gap. Solvers have caught up on some of the live game &mdash;
+      straddles, limped pots and multiway preflop are all solved now. What stays thin is multiway
+      <em>postflop</em>, which is most of what a $1/$2 table actually plays. And no solver will
+      ever seat you across from somebody who remembers how you played him last Tuesday.</p>
   </div>
 </section>
 
@@ -348,9 +349,46 @@ footer .mark{font-family:'Limelight',cursive;font-size:16px;color:var(--brass);l
       </div>
       <div class="feat">
         <h3>The live game: straddles, limpers, four-way pots</h3>
-        <p>The parts of poker that solvers skip and other trainers ignore &mdash; and the parts you
+        <p>The parts of poker other trainers ignore &mdash; and the parts you
           will actually face at $1/$2. Isolation sizing over limpers, why a straddle halves
           everyone&rsquo;s stack, and why one pair is a bluff-catcher when four people saw the flop.</p>
+      </div>
+      <div class="feat">
+        <h3>It asks for your read before it tells you</h3>
+        <p>Facing a bet, the app stops and asks one question first: against the hands
+          <em>he</em> would be betting here, are you ahead, marginal or behind? Then the verdict
+          leads with whether the read was right, before it says a word about the action. Guessing
+          wrong is not wasted &mdash; being asked before being told is what makes the answer
+          stick.</p>
+      </div>
+      <div class="feat">
+        <h3>Show me his range</h3>
+        <p>After any graded hand, one tap opens the whole table the coach used: all 169 starting
+          hands, shaded by how often <em>this</em> player bets each one, with the arithmetic
+          underneath. Not a model of a typical opponent &mdash; the actual weights the bot rolled
+          against. No other trainer can show you this, because no other trainer wrote the
+          opponent.</p>
+      </div>
+      <div class="feat">
+        <h3>Nothing is tested before it is taught</h3>
+        <p>Every chapter opens with a briefing that teaches exactly what its levels are about to
+          ask &mdash; the seats and why position pays, how to count outs, what a range even is,
+          what to do about each type &mdash; and ends by telling you what you are about to be
+          tested on.</p>
+      </div>
+      <div class="feat">
+        <h3>Two trainers for the fundamentals</h3>
+        <p>Opening ranges are poker&rsquo;s basic strategy, so they get their own practice mode
+          that keeps its own memory and never touches your stats &mdash; including a map of the
+          hands <em>you personally</em> keep getting wrong. And a read trainer that starts you
+          with one opponent to name instead of five, then shows which types you are mixing up.</p>
+      </div>
+      <div class="feat">
+        <h3>A written debrief at the end of every session</h3>
+        <p>Not a scoreboard. It opens with the best decision you made, then what it cost you,
+          then the single most expensive call of the night with a button to replay it. It grades
+          decisions and never chips &mdash; and on a short session it refuses to put a letter on
+          you at all, because a handful of hands cannot support one.</p>
       </div>
       <div class="feat">
         <h3>A leak report that refuses to guess</h3>
