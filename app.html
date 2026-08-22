@@ -1000,17 +1000,38 @@ function expandToken(t){
     const hi=R[t[0]], lo=R[t[1]], sf=t[2], out=[];
     for(let x=lo;x<hi;x++) out.push(RANKC[hi]+RANKC[x]+sf); return out;
   }
+  if(/^[AKQJT2-9]{2}[so]\-[AKQJT2-9]{2}[so]$/.test(t)){   /* A5s-A2s */
+    /* "A5s-A2s" -> 0:A 1:5 2:s 3:- 4:A 5:2 6:s   (the dash is index 3) */
+    const hi=R[t[0]], a=R[t[1]], sf=t[2], b=R[t[5]], out=[];
+    if(R[t[4]]===hi && t[6]===sf){
+      for(let x=Math.min(a,b); x<=Math.max(a,b); x++) out.push(RANKC[hi]+RANKC[x]+sf);
+      return out;
+    }
+  }
   if(/^[AKQJT2-9]{2}[so]$/.test(t)) return [t];
+  /* A token that matches nothing used to return [] silently, so a range could
+     quietly lose hands and still look right. Fail loudly instead. */
+  console.warn('parseRange: unrecognised token "'+t+'" contributed no hands');
   return [];
 }
 const parseRange = str => str.split(',').flatMap(expandToken);
 /* standard 6-max opening ranges (raise-first-in) */
+/* Raise-first-in ranges, six-handed, 100bb. Widths verified against the app's
+   own combo weighting and published 6-max RFI charts:
+     UTG 15.1%  HJ 19.2%  CO 26.7%  BTN 47.5%  SB 37.0%
+   The previous table taught a 26% button. Every published chart puts it at
+   40-48%, and playing too tight on the button is the most common losing leak
+   in live poker - so the app was marking the correct play as a mistake, in the
+   seat where positional profit is actually made.
+   There is deliberately no BB key: the big blind never opens. Anything that
+   consumes this table must treat a missing key as "not gradable", never as
+   "fold everything" - see gradeHero and runBranch. */
 const OPEN_RANGES = {
-  UTG: parseRange("77+,ATs+,KTs+,QTs+,JTs,AQo+"),
-  HJ:  parseRange("66+,A9s+,KTs+,QTs+,J9s+,T9s,AJo+,KQo"),
-  CO:  parseRange("44+,A7s+,K9s+,Q9s+,J9s+,T8s+,98s,ATo+,KJo+"),
-  BTN: parseRange("22+,A2s+,K7s+,Q8s+,J8s+,T8s+,97s+,87s,76s,65s,A8o+,KTo+,QTo+,JTo"),
-  SB:  parseRange("22+,A2s+,K8s+,Q9s+,J9s+,T9s,A9o+,KJo+,QJo"),
+  UTG: parseRange("55+,A2s+,KTs+,QTs+,JTs,T9s,98s,AJo+,KJo+"),
+  HJ:  parseRange("44+,A2s+,K9s+,Q9s+,J9s+,T8s+,97s+,87s,ATo+,KJo+,QJo"),
+  CO:  parseRange("22+,A2s+,K7s+,Q8s+,J8s+,T8s+,97s+,86s+,76s,65s,A8o+,KTo+,QTo+,JTo"),
+  BTN: parseRange("22+,A2s+,K2s+,Q4s+,J6s+,T6s+,95s+,85s+,74s+,64s+,53s+,A2o+,K7o+,Q8o+,J8o+,T8o+,98o"),
+  SB:  parseRange("22+,A2s+,K4s+,Q6s+,J7s+,T7s+,96s+,86s+,75s+,65s,54s,A4o+,K9o+,Q9o+,J9o+,T9o"),
 };
 const POS_NAMES = ['UTG','HJ','CO','BTN','SB','BB'];
 const POS_DESC = {
@@ -1491,6 +1512,29 @@ function refreshProfiles(){
     if(G.handNo % 6 === 0) s.profile.mood = (Math.random()*2-1)*.16;
     const m = s.profile.mood || 0;
     let aggr=b.aggr*(1+m), bluff=b.bluff*(1+m*1.4), call=b.callDown, vpip=b.vpip*(1+m*.5);
+
+    /* THE GEAR SHIFTER. FAMILIES describes this type as "changes style every
+       few hands on purpose" and ADJUST tells the player to throw out their
+       read - but nothing anywhere was keyed on fam==='shift', so the one type
+       whose entire identity is changing gear never changed. The app described
+       a player who did not exist.
+       It now alternates between a tight-passive and a loose-aggressive gear on
+       an irregular clock, so a fixed read on it genuinely goes stale. Applied
+       to the same live profile object villainBetRange reads, so the coach
+       describes the CURRENT gear and the mirror holds. */
+    let gearPfr = null;
+    if(b.fam === 'shift'){
+      if(s._gearAt == null || G.handNo - s._gearAt >= 7 + (s._gearPhase || 0)){
+        s._gearAt = G.handNo;
+        s._gearPhase = Math.floor(Math.random()*4);   /* irregular, so it cannot be counted */
+        s._gear = s._gear === 'loose' ? 'tight' : 'loose';
+      }
+      const up = s._gear === 'loose';
+      aggr  *= up ? 1.45 : 0.60;
+      bluff *= up ? 1.70 : 0.40;
+      vpip  *= up ? 1.45 : 0.62;
+      gearPfr = clamp(b.pfr * (up ? 1.60 : 0.55), .02, .90);
+    }
     const rate = ADAPT_RATE[b.fam] ?? .25;
     let pressure = 0;
     if(heroFoldL!=null){
@@ -1510,6 +1554,9 @@ function refreshProfiles(){
     s.profile.bluff = clamp(bluff,.01,.92);
     s.profile.callDown = clamp(call,.05,.95);
     s.profile.vpip  = clamp(vpip, .05,.90);
+    /* pfr is not otherwise recomputed here, so the gear sets it explicitly -
+       and never above vpip, which would be incoherent. */
+    if(gearPfr != null) s.profile.pfr = Math.min(gearPfr, s.profile.vpip);
     s.adapted = pressure;                       /* surfaced in the HUD */
   });
 }
@@ -1595,8 +1642,13 @@ function betProbability(P, o){
 
   /* the continuation bet — the most common action in poker, and the one
      our bots never made before */
-  if(isAggr && street === 1 && pct <= .70)
-    p = Math.max(p, (.42 + P.aggr * .40) * (1 - wet * .45) * posMul);
+  if(isAggr && street === 1){
+    /* The floor used to stop at pct <= .70, so weak hands cleared a bar that
+       top pair did not and c-bet MORE often than clear value - inverted for
+       every profile in the roster. Value keeps a margin above the bluff rate. */
+    const cbFloor = (.42 + P.aggr * .40) * (1 - wet * .45) * posMul;
+    p = Math.max(p, pct > .70 ? cbFloor * 1.18 : cbFloor);
+  }
   /* stories have to stay coherent: give up on later streets */
   if(pct <= .55 && draw < 2){
     if(barrels >= 1) p *= .55;
@@ -1899,7 +1951,12 @@ function botChoose(s){
       /* a raise means something, even to a maniac */
       if(c > Math.min(.985, raiseBar+0.06) && Math.random() < 0.55)
         return {a:'bet', amt:Math.round(Math.max(G.currentBet*2.7, G.currentBet+G.lastRaise))};
-      if(c > contBar+0.03) return {a:'call'};
+      /* A raise to 3bb and an all-in for 200bb were previously the same
+         decision, because nothing here looked at the price. Widen the bar with
+         the size of the bet being faced. */
+      const priceBB = L.toCall / (G.bb || 1);
+      const sizeBar = Math.min(0.34, Math.max(0, (priceBB - 3) * 0.013));
+      if(c > contBar + 0.03 + sizeBar) return {a:'call'};
       if(Math.random() < P.bluff*0.18 && L.toCall <= G.bb*4) return {a:'call'};
       return {a:'fold'};
     }
@@ -2274,6 +2331,8 @@ function brainLabel(){
   b.textContent = '\u{1F9E0} Think (' + BRAIN.left + ')';
   b.disabled = BRAIN.left<=0;
 }
+/* Same hole as the grader had: with a straddle live the big blind is not
+   closing the action, so this fell through and recommended folding aces. */
 function brainAdvice(s, L){
   const el=$('#playCoach');
   const code = handCode(s.hole[0], s.hole[1]);
@@ -2911,6 +2970,10 @@ function gradeHero(s, dec, L){
               ? G.straddles[G.straddles.length-1] : null;
     const opened = G.currentBet > (_sd ? _sd.amount : G.bb);
     const closesAction = _sd ? (G.seats.indexOf(s) === _sd.seat) : (pos === 'BB');
+    /* No opening chart for this seat means NOT GRADABLE - never "fold
+       everything". Written generically so a position added later without a
+       range fails silently-off rather than silently-fold. */
+    if(!opened && !closesAction && !OPEN_RANGES[pos]){ coachHide(el); return; }
     if(!opened && !closesAction && !gradedHere('preflop')){
       /* not yet taught: show the chart's answer as information, score nothing */
       const should = inOpenRange(code,pos);
@@ -3828,7 +3891,10 @@ function dPotOdds(st){
   const pot=[100,150,200,300][Math.floor(Math.random()*4)];
   const bet=Math.round(pot*[0.33,0.5,0.75,1][Math.floor(Math.random()*4)]);
   const outs=2+Math.floor(Math.random()*13);
-  const need=bet/(pot+bet);
+  /* pot is stated BEFORE their bet, so the pot you are calling into is
+     pot+bet and the total you win is pot+2*bet. Using bet/(pot+bet) here
+     overstated the price by a whole bet on every single question. */
+  const need=bet/(pot+2*bet);
   const eq=outs/47;                       /* one card to come */
   const should=eq>need;
   const q=document.createElement('div'); q.className='quiz-q';
@@ -3839,7 +3905,7 @@ function dPotOdds(st){
     opts.appendChild(optButton(lab, v===should, (b,ok)=>{
       b.className='abtn sm '+(ok?'gold':'danger');
       drillResult(ok, should?'Call':'Fold',
-        `You must win <b>${Math.round(need*100)}%</b> ($${bet} to win $${pot+bet}). ${outs} outs on one card is about <b>${Math.round(eq*100)}%</b> — ${should?'the price is good.':'the price is wrong.'}`);
+        `You must win <b>${Math.round(need*100)}%</b> — you put in $${bet} to win a pot of $${pot+2*bet}. ${outs} outs on one card is about <b>${Math.round(eq*100)}%</b> — ${should?'the price is good.':'the price is wrong.'}`);
     }));
   });
   st.append(q,sub,opts);
@@ -4150,10 +4216,12 @@ const BRIEF = [
   <h4>The three things that catch everyone out</h4>
   <p><b>The ace bends both ways.</b> A-K-Q-J-T is the highest straight; A-2-3-4-5 is the
   lowest, and there it counts as a one. It does not wrap: Q-K-A-2-3 is nothing.</p>
-  <p><b>Kickers decide ties.</b> If you and your opponent both hold a pair of kings, the
-  next-highest card settles it. A&hearts;K&spades; and K&hearts;7&clubs; on a K-9-4-2-3 board is not a
-  chop &mdash; the ace plays as the fifth card and wins. This is where most beginners
-  misread a showdown.</p>
+  <p><b>Kickers decide ties.</b> When two players hold the same pair, the highest side card
+  settles it. A&hearts;K&spades; against K&hearts;7&clubs; on a K-9-4-2-3 board is not a chop: both make
+  a pair of kings, but the best five you can build are <b>K-K-A-9-4</b> against
+  <b>K-K-9-7-4</b>. Compare them card by card from the top &mdash; kings match, then your ace
+  beats their nine, and it is over. Their seven never even gets used. This is where most
+  beginners misread a showdown.</p>
   <p><b>Sometimes nobody's cards matter.</b> If the board is A-K-Q-J-T with no flush
   possible, everyone still in has the same straight and the pot is split, however pretty
   your hole cards were.</p>
@@ -4208,8 +4276,11 @@ const BRIEF = [
   is a fold in one seat and a raise in another &mdash; not because it changed, but because
   the number of people who can beat you did.</p>
   <p>Roughly: about <b>15%</b> of hands from under the gun, widening through the hijack and
-  cutoff to about <b>45%</b> on the button. The <b>Ranges</b> tab draws the exact chart for
-  every seat &mdash; go and look at it before this chapter, and again during it.</p>
+  cutoff to nearly <b>half the deck</b> on the button. The <b>Ranges</b> tab draws the exact
+  chart for each of the five seats that can open &mdash; go and look at it before this chapter,
+  and again during it. There is no chart for the big blind, because the big blind never opens:
+  the money is already in, so the decision there is always whether to <i>defend</i> against
+  somebody else's raise.</p>
   <h4>Raise or fold. Almost never limp</h4>
   <p>Calling the big blind &mdash; <b>limping</b> &mdash; is how most money quietly leaves a
   live game. It wins the pot only by making a hand, never by making people fold, it invites
@@ -4231,15 +4302,21 @@ const BRIEF = [
   that pairs the board can fill a full house for them.</p>
   <h4>The rule of four and two</h4>
   <p>With <b>two cards to come</b>, multiply your outs by <b>4</b>. With <b>one card to
-  come</b>, multiply by <b>2</b>. Nine outs on the flop &asymp; 36%. Nine outs on the turn
-  &asymp; 18%. It runs a couple of points high on big draws, which is close enough at a
-  table.</p>
+  come</b>, multiply by <b>2</b>. Nine outs on the flop &asymp; 36% (the true figure is 35%).
+  Nine outs on the turn &asymp; 18% (true 19%).</p>
+  <p>The two halves fail differently, and only one of them matters. The <b>&times;2</b> rule is
+  accurate to within a point everywhere. The <b>&times;4</b> rule runs increasingly <i>high</i>
+  as the draw gets bigger &mdash; about a point out at nine outs, three at twelve, nearly six at
+  fifteen. So with a monster draw, shade your estimate down a little.</p>
   <h4>Pot odds</h4>
-  <p>To call a bet of <b>B</b> into a pot of <b>P</b>, you are risking B to win P plus your
-  own B. The share you need is <b>B &divide; (P + B)</b>.</p>
-  <p>Called $25 into a $75 pot: 25 &divide; 100 = <b>25%</b>. So you need to win a quarter
-  of the time. With nine outs and two cards to come you have about 36% &mdash; a clear call.
-  With four outs you have about 16% &mdash; a fold, however much you like the hand.</p>
+  <p>Count the pot <b>after</b> their bet is in it &mdash; call that <b>P</b> &mdash; and let
+  <b>B</b> be what it costs you to call. You risk B to win P plus your own B, so the share you
+  need is <b>B &divide; (P + B)</b>. Getting this backwards, by using the pot from before they
+  bet, is the most common way people talk themselves into a bad fold.</p>
+  <p>They bet $25 into a $75 pot. The pot is now <b>$100</b>, and calling costs you $25, so you
+  need 25 &divide; 125 = <b>20%</b>. With nine outs and two cards to come you have about 35%
+  &mdash; a clear call. With four outs you have about 16% &mdash; a fold, however much you like
+  the hand.</p>
   <div class="key"><p>Compare the two numbers. <b>Equity above the price: call. Below it:
   fold.</b> That is the entire calculation, and it is the floor this app builds on &mdash;
   everything in the next chapters is about adjusting the first number once you know who
@@ -4314,10 +4391,11 @@ const BRIEF = [
     <tr><td><b>Shift</b></td><td>Throw out the old read and watch again &mdash; they have changed gear.</td></tr>
   </table>
   <h4>What the coach is actually doing</h4>
-  <p>When you face a bet, the app enumerates every hand that player could hold, weights each
-  by how often <i>this specific opponent</i> would have played it and would be betting it
-  now, and computes exactly what your call is worth against that. Because the app wrote
-  them, that number is not an estimate. Press <b>Show me his range</b> after a graded
+  <p>When you face a bet, the app enumerates every hand that player could hold and weights each
+  one by how often <i>this specific opponent</i> would have played it and would be betting it
+  now. That range is exact, because the app wrote him &mdash; there is no guessing about what he
+  would do. Your equity against it is then simulated, so the percentage carries a point or two
+  of noise; the shape of the read does not. Press <b>Show me his range</b> after a graded
   decision and you can look at the whole table it used.</p>
   <div class="tested"><h4>What you'll be tested on</h4>
   <p>Sessions at deliberately stacked tables &mdash; a table of rocks, a table of stations, a
@@ -4387,9 +4465,10 @@ const BRIEF = [
   <h4>Limpers, and isolating them</h4>
   <p>When three players limp, the pot is already large and the field is weak. Raising here
   &mdash; <b>isolating</b> &mdash; is one of the most profitable plays in a live game, but
-  the sizing is not the one you use in an unopened pot. Standard is about
-  <b>4 big blinds plus one per limper</b>, and more when you will be out of position. Raise
-  too small and you get called by everyone, which is the opposite of isolating.</p>
+  the sizing is not the one you use in an unopened pot. The rule this app grades you against
+  is <b>3 big blinds, plus one more for every limper</b>, plus <b>one more again</b> if you
+  will be out of position. Two limpers, in position: 3 + 2 = <b>5 big blinds</b>. Raise too
+  small and you get called by everyone, which is the opposite of isolating.</p>
   <h4>Why bluffing dies multiway</h4>
   <p>A bluff needs everyone to fold. If one opponent folds 60% of the time, then against two
   the bluff works 0.6 &times; 0.6 = <b>36%</b> of the time, and against three
@@ -5826,7 +5905,16 @@ function seatInPosition(seat){
   const i=G.seats.indexOf(seat);
   if(i<0) return true;                      /* synthetic seat from a drill */
   const n=G.seats.length;
-  return ((i - G.btn + n) % n) <= 1;
+  /* Postflop the action starts at the small blind and ends at the button, so
+     the seat in position is simply the last one still in the hand. This used
+     to be `offset <= 1`, which counted the SMALL BLIND as in position - the
+     seat that acts first on every street and is the worst at the table.
+     Computed over live seats, so folding the button promotes whoever is
+     actually last, which is what "in position" means. */
+  const ord = s => { const o = (G.seats.indexOf(s) - G.btn + n) % n; return o === 0 ? n : o; };
+  const live = G.seats.filter(s => !s.folded);
+  if(!live.length) return true;
+  return live.reduce((a, s) => ord(s) > ord(a) ? s : a, live[0]) === seat;
 }
 /* The context a villain ACTUALLY decided with. Falls back to a re-derivation
    only when that seat has not acted yet this street. Each villain carries its
