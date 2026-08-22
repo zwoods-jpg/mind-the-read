@@ -1,7 +1,7 @@
 /* Mind The Read — service worker.
    Navigations are NETWORK-FIRST so an update always reaches the player;
    assets are cache-first so an installed copy still opens offline. */
-const CACHE = 'mtr-v3';
+const CACHE = 'mtr-v4';
 const CORE = ['./', './app.html', './index.html', './manifest.json',
               './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png'];
 

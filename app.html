@@ -217,6 +217,48 @@ nav{display:flex;gap:6px;flex-wrap:wrap;padding:6px 0 16px;align-items:center}
 .ranknext{font-size:12px;color:var(--dim);margin-top:6px}
 .rankprog{height:5px;border-radius:99px;background:rgba(0,0,0,.35);overflow:hidden;margin-top:6px;max-width:280px}
 .rankprog b{display:block;height:100%;background:var(--brass);border-radius:99px;transition:width .5s ease}
+
+/* ---------- level result overlay ---------- */
+#burst{position:fixed;inset:0;z-index:495;pointer-events:none;display:none}
+.result{position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;
+  padding:18px;background:rgba(3,11,14,.86);backdrop-filter:blur(4px);
+  animation:resFade .28s ease both}
+@keyframes resFade{from{opacity:0}to{opacity:1}}
+.result-in{max-width:460px;width:100%;text-align:center;
+  background:#0E2831;border:1px solid var(--line);border-radius:18px;padding:30px 26px 24px;
+  box-shadow:0 30px 80px rgba(0,0,0,.65);animation:resPop .42s cubic-bezier(.16,1.06,.3,1) both}
+@keyframes resPop{from{transform:scale(.86) translateY(14px);opacity:0}to{transform:none;opacity:1}}
+.result.bad .result-in{animation:resShake .5s cubic-bezier(.36,.07,.19,.97) both}
+@keyframes resShake{
+  0%{transform:scale(.9);opacity:0} 20%{transform:scale(1) translateX(-11px);opacity:1}
+  35%{transform:translateX(9px)} 50%{transform:translateX(-7px)} 65%{transform:translateX(5px)}
+  80%{transform:translateX(-3px)} 100%{transform:none}}
+.result-kicker{font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim)}
+.result-title{font-family:'Limelight',cursive;font-size:clamp(30px,7vw,44px);line-height:1.05;
+  margin:8px 0 6px;letter-spacing:.02em}
+.result.good .result-title{color:var(--brass-hi);text-shadow:0 0 26px rgba(231,187,87,.32)}
+.result.bad  .result-title{color:var(--bad)}
+.result-lv{font-size:17px;font-weight:700;margin-bottom:4px}
+.result-why{font-size:14.5px;color:#CFD6D1;line-height:1.55;margin:8px 0 16px}
+.result-actions{display:flex;flex-direction:column;gap:9px}
+.result-actions .abtn{width:100%}
+.rankpop{border:1px solid var(--brass);border-radius:12px;padding:14px;margin:6px 0 16px;
+  background:linear-gradient(180deg,rgba(200,145,47,.18),rgba(200,145,47,.05));
+  animation:rankGlow 1.5s ease-in-out 2}
+@keyframes rankGlow{0%,100%{box-shadow:0 0 0 rgba(231,187,87,0)}50%{box-shadow:0 0 26px rgba(231,187,87,.35)}}
+.rankpop .rk{font-family:'Limelight',cursive;font-size:26px;color:var(--brass-hi);line-height:1.1}
+.rankpop .rl{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+.streak{display:inline-block;font-size:12px;letter-spacing:.05em;color:var(--brass-hi);
+  border:1px solid var(--brass);border-radius:99px;padding:3px 10px;margin-bottom:10px}
+
+/* micro-feedback on drill answers */
+@keyframes pulseGood{0%{transform:none}45%{transform:scale(1.07)}100%{transform:none}}
+@keyframes nudgeBad{0%,100%{transform:none}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.abtn.gold.pulse{animation:pulseGood .34s ease}
+.abtn.danger.nudge{animation:nudgeBad .3s ease}
+@media (prefers-reduced-motion: reduce){
+  .result,.result-in,.rankpop,.abtn.pulse,.abtn.nudge{animation:none !important}
+}
 .think{position:absolute;left:50%;transform:translateX(-50%);bottom:-6px;height:3px;width:34px;
   border-radius:99px;background:rgba(255,255,255,.14);overflow:hidden}
 .think b{display:block;height:100%;width:0;background:var(--brass);border-radius:99px}
@@ -515,6 +557,7 @@ footer{margin-top:26px;text-align:center;font-size:12px;color:var(--dim);opacity
 <footer>Training tool — simulated play only, no real money and no wagering.</footer>
 </div>
 
+<canvas id="burst"></canvas>
 <div class="tracker" id="tracker"></div>
 
 <script>
@@ -539,6 +582,8 @@ if(ST.image===undefined) ST.image=true;
 if(ST.timing===undefined) ST.timing=true;
 if(ST.brain===undefined) ST.brain=true;
 if(ST.stackBB===undefined) ST.stackBB=100;
+if(ST.sound===undefined) ST.sound=true;
+if(ST.motion===undefined) ST.motion=true;
 if(ST.live===undefined) ST.live=false;
 if(ST.straddleRate===undefined) ST.straddleRate=0.55;
 function freshStats(){
@@ -2877,6 +2922,7 @@ async function bettingRound(){
     if(s.isHero && (dec.a==='call' || dec.a==='bet'))
       G.heroCommit = {street:G.street, board:G.board.map(c=>({r:c.r,s:c.s}))};
     histAct(s, dec, G.street, potBefore, toCallNow);
+    SFX.play(dec.a==='fold' ? 'fold' : dec.a==='check' ? 'check' : 'chip');
     applyAction(s, dec.a, dec.amt);
     /* the engine rounds and clamps to the stack, so the log must record what
        actually happened rather than what the bot asked for */
@@ -2901,7 +2947,7 @@ async function runHand(){
     if(street>0){
       G.seats.forEach(s=>{ s.bet=0; s.acted=false; s.lastAct=''; s.checkedThisStreet=false; s.ctx=null; });
       G.currentBet=0; G.lastRaise=G.bb; G.raisesThisStreet=0;
-      dealBoard(street); renderAll(); await sleep(T(480));
+      dealBoard(street); SFX.play('card'); renderAll(); await sleep(T(480));
     }
     if(activeSeats().length>1 && canActSeats().length>1) await bettingRound();
     if(activeSeats().length<=1) break;
@@ -2910,6 +2956,7 @@ async function runHand(){
 }
 async function settle(){
   const live=activeSeats();
+  SFX.play('pot');
   if(live.length>1) live.forEach(s=>s.reveal=true);
   renderAll(); await sleep(T(400));
   const heroSeat=G.seats[G.heroIdx];
@@ -3210,6 +3257,13 @@ function optButton(txt, correct, onPick){
   return b;
 }
 function drillResult(ok, verdict, why){
+  SFX.play(ok?'ok':'wrong');
+  if(ST.motion!==false){
+    const b=document.querySelector('#drillStage .optgrid button.gold, #drillStage .optgrid button.danger');
+    if(b) b.classList.add(ok?'pulse':'nudge');
+    const hb=document.querySelector('#drillStage .handbox.pick-good, #drillStage .handbox.pick-bad');
+    if(hb) hb.style.animation = (ok?'pulseGood':'nudgeBad')+' .34s ease';
+  }
   dLock=true; dTotal++; if(ok){ dRight++; dStreak++; } else dStreak=0;
   const st=STATS.drill[drillMode]; st[1]++; if(ok) st[0]++;
   STATS.decisions[1]++; if(ok) STATS.decisions[0]++;
@@ -3719,6 +3773,100 @@ function campStart(i){
   }
   renderTracker();
 }
+/* ---------- a burst of chips, drawn rather than shipped as an asset ---------- */
+function burst(kind){
+  if(ST.motion===false) return;
+  if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cv=$('#burst'); if(!cv) return;
+  const dpr=Math.min(2, window.devicePixelRatio||1);
+  cv.width=innerWidth*dpr; cv.height=innerHeight*dpr;
+  cv.style.display='block';
+  const g=cv.getContext('2d'); g.scale(dpr,dpr);
+  const COL = kind==='rank' ? ['#E7BB57','#C8912F','#F2EEE3','#5FBE86']
+                            : ['#C8912F','#E7BB57','#F2EEE3'];
+  const N = kind==='rank' ? 130 : 90;
+  const bits=[];
+  for(let i=0;i<N;i++){
+    bits.push({x:innerWidth/2 + (Math.random()-.5)*140,
+               y:innerHeight/2 + (Math.random()-.5)*60,
+               vx:(Math.random()-.5)*9, vy:-(4+Math.random()*9),
+               r:3+Math.random()*4, c:COL[(Math.random()*COL.length)|0],
+               sp:(Math.random()-.5)*0.3, a:Math.random()*Math.PI, life:1});
+  }
+  let t0=null;
+  function frame(ts){
+    if(t0===null) t0=ts;
+    const dt=Math.min(34, ts-(frame.last||ts)); frame.last=ts;
+    g.clearRect(0,0,innerWidth,innerHeight);
+    let alive=false;
+    bits.forEach(b=>{
+      if(b.life<=0) return;
+      alive=true;
+      b.vy += 0.34*(dt/16); b.x += b.vx*(dt/16); b.y += b.vy*(dt/16);
+      b.a += b.sp; b.life -= 0.007*(dt/16);
+      g.save(); g.globalAlpha=Math.max(0,b.life); g.translate(b.x,b.y); g.rotate(b.a);
+      g.fillStyle=b.c;
+      g.beginPath(); g.ellipse(0,0,b.r,b.r*0.42,0,0,Math.PI*2); g.fill();
+      g.restore();
+    });
+    if(alive && ts-t0 < 2600) requestAnimationFrame(frame);
+    else { g.clearRect(0,0,innerWidth,innerHeight); cv.style.display='none'; }
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ---------- what happens when a level ends ----------
+   Previously this fired a toast and tried to bounce you back to the campaign
+   screen — but only from the play pane, so finishing a DRILL level left you
+   stranded on the drill screen whose Next button just served another practice
+   question. Now every ending shows the same panel, and passing offers the
+   next level as the primary action. */
+function showResult(opts){
+  closeSheet();
+  $$('.result').forEach(e=>e.remove());
+  const good = !!opts.win;
+  const el=document.createElement('div');
+  el.className='result '+(good?'good':'bad');
+  /* the next level comes from campaign progress, which campEnd updates before
+     calling this. Guard anyway: offering the level just finished would send the
+     player round in a circle. */
+  let nextIdx = campIdx();
+  if(CAMP[nextIdx] && opts.lv && CAMP[nextIdx].id === opts.lv.id) nextIdx++;
+  const nextLv = nextIdx < CAMP.length ? CAMP[nextIdx] : null;
+  el.innerHTML = `
+    <div class="result-in">
+      <div class="result-kicker">${good?'Level complete':'Try again?'}</div>
+      <div class="result-title">${good?'CONGRATULATIONS!':'LEVEL FAILED'}</div>
+      <div class="result-lv">${opts.lv.t}</div>
+      ${opts.streak?`<div class="streak">${opts.streak}</div>`:''}
+      ${opts.rank?`<div class="rankpop"><div class="rl">New rank</div><div class="rk">${opts.rank}</div></div>`:''}
+      <div class="result-why">${good
+        ? (opts.lv.g||'')
+        : (opts.why ? opts.why.charAt(0).toUpperCase()+opts.why.slice(1)+'.' : '') +
+          `<br><small style="opacity:.72">Target: ${opts.lv.g}</small>`}</div>
+      <div class="result-actions">
+        ${good
+          ? (nextLv
+              ? `<button class="abtn gold" id="resNext">Next level: ${nextLv.t} &rarr;</button>`
+              : `<button class="abtn gold" id="resDone">Every level cleared</button>`)
+          : `<button class="abtn gold" id="resRetry">Try again</button>`}
+        <button class="abtn quiet" id="resBack">Back to the campaign</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  const go = fn => { el.remove(); fn && fn(); };
+  const back = ()=>{ goPane('camp'); renderCampaign(); };
+  const nx=$('#resNext');
+  if(nx){ nx.onclick=()=>go(()=>{ if(nextLv) campStart(CAMP.indexOf(nextLv)); }); setTimeout(()=>nx.focus(),60); }
+  const rt=$('#resRetry');
+  if(rt){ rt.onclick=()=>go(()=>campStart(CAMP.indexOf(opts.lv))); setTimeout(()=>rt.focus(),60); }
+  const dn=$('#resDone'); if(dn) dn.onclick=()=>go(back);
+  $('#resBack').onclick=()=>go(back);
+  el.addEventListener('click', e=>{ if(e.target===el) go(back); });
+  if(good){ burst(opts.rank?'rank':'pass'); SFX.play(opts.rank?'rank':'pass'); }
+  else SFX.play('fail');
+}
+
 function campRestore(){
   if(campSaved){ ST.hud=campSaved.hud;
     if(campSaved.live!==undefined) ST.live=campSaved.live;
@@ -3737,29 +3885,22 @@ function campEnd(win, lvIn){
     saveAll();
     const t0=titleFor(before), t1=titleFor(after);
     TRACK.track('level_complete', {level:lv.id, cleared:after, rank:t1.name});
-    if(t1.name!==t0.name){
-      TRACK.track('rank_earned', {rank:t1.name, cleared:after});
-      toast('\u2605 New rank: '+t1.name);
-    }
-    else toast('✓ '+lv.id+' complete — '+lv.t);
-    /* only bounce the user back if they are still looking at the table */
-    setTimeout(()=>{
-      if(!campLv && document.querySelector('#pane-play')?.classList.contains('on')) goPane('camp');
-    },1000);
+    const promoted = t1.name!==t0.name;
+    if(promoted) TRACK.track('rank_earned', {rank:t1.name, cleared:after});
+    renderCampaign();
+    showResult({win:true, lv, rank: promoted ? t1.name : null,
+                streak: after>1 ? after+' levels cleared' : null});
   }
   renderCampaign();
 }
 function campFail(msg, lvIn){
   const lv=lvIn||campLv;
   if(!lv){ campLv=null; dQ=null; campRestore(); return; }
-  const i=CAMP.indexOf(lv); campLv=null; dQ=null; campRestore();
+  campLv=null; dQ=null; campRestore();
   TRACK.track('level_failed', {level:lv.id, why:String(msg).slice(0,60)});
-  const tr=$('#tracker'); tr.style.display='flex';
-  tr.innerHTML=`<b style="color:var(--bad)">✗ ${lv.t}</b><span>${msg}</span>
-    <button class="abtn quiet sm" id="cRetry">Retry</button>
-    <button class="abtn quiet sm" id="cQuit">Later</button>`;
-  $('#cRetry').onclick=()=>{ tr.style.display='none'; campStart(i); };
-  $('#cQuit').onclick =()=>{ tr.style.display='none'; goPane('camp'); renderCampaign(); };
+  $('#tracker').style.display='none';
+  renderCampaign();
+  showResult({win:false, lv, why:String(msg)});
 }
 function renderTracker(){
   const tr=$('#tracker');
@@ -3783,8 +3924,11 @@ function campHook(type,d){
   const lv=campLv, c=campSt;
   if(lv.type==='drill' && type==='drill' && d.mode===lv.mode){
     c.n++; if(d.ok) c.ok++;
-    if(c.n>=lv.n) return (c.ok>=lv.need)? campEnd(true) : campFail(c.ok+' of '+lv.n+' — needed '+lv.need);
-    if(c.ok + (lv.n-c.n) < lv.need) return campFail("can't reach "+lv.need+' now');
+    if(c.n>=lv.n) return (c.ok>=lv.need)? campEnd(true)
+                    : campFail('you got '+c.ok+' of '+lv.n+' right, and '+lv.need+' are needed');
+    if(c.ok + (lv.n-c.n) < lv.need)
+      return campFail('only '+c.ok+' right with '+(lv.n-c.n)+' question'+((lv.n-c.n)===1?'':'s')+
+                      ' left, and '+lv.need+' are needed');
   }
   if(lv.type==='play' && type==='hand'){
     c.hands++;
@@ -3835,14 +3979,14 @@ function finishPlayLevel(lv,c){
   const rdOK    = !lv.needReads || (c.reads||0)>=needR;
   const adjOK   = !lv.needAdjust || (c.adjust||0)>=Math.min(lv.needAdjust, askable);
   if(preOK && postOK && sdOK && rdOK && bandOK && adjOK) return campEnd(true, lv);
-  const why = !preOK  ? 'preflop '+Math.round(100*sessionPre[0]/Math.max(1,sessionPre[1]))+'%'
-            : !postOK ? (sessionPost[1]<3 ? 'not enough exploit decisions - face more bets'
-                        : 'exploit decisions '+Math.round(100*sessionPost[0]/sessionPost[1])+'%')
-            : !bandOK ? (H.faced<6 ? 'too few decisions facing a bet'
-                        : 'you folded to '+Math.round(ff*100)+'% of bets - too readable')
-            : !rdOK   ? 'reads '+(c.reads||0)+'/'+lv.needReads
-            : !adjOK  ? 'adjustments '+(c.adjust||0)+'/'+lv.needAdjust
-            : 'only '+c.showdowns+' showdowns';
+  const why = !preOK  ? 'your preflop accuracy was '+Math.round(100*sessionPre[0]/Math.max(1,sessionPre[1]))+'%'
+            : !postOK ? (sessionPost[1]<3 ? 'you did not face enough bets to be graded on the read'
+                        : 'your exploit decisions were '+Math.round(100*sessionPost[0]/sessionPost[1])+'%')
+            : !bandOK ? (H.faced<6 ? 'you did not face enough bets to be measured'
+                        : 'you folded to '+Math.round(ff*100)+'% of bets, which is too readable')
+            : !rdOK   ? 'you named '+(c.reads||0)+' of '+lv.needReads+' players correctly'
+            : !adjOK  ? 'you got '+(c.adjust||0)+' of '+lv.needAdjust+' adjustments right'
+            : 'you reached only '+c.showdowns+' showdown'+(c.showdowns===1?'':'s');
   campFail(why, lv);
 }
 function rankBarHTML(){
@@ -4141,6 +4285,10 @@ $('#setBtn').onclick=()=>{
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <span>Stats HUD <small style="color:var(--dim)">(after 5 hands)</small></span><span id="hudSeg"></span></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span>Sound</span><span id="sndSeg"></span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span>Animations</span><span id="motSeg"></span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <span>Live game <small style="color:var(--dim)">(straddles &amp; limpers)</small></span><span id="liveSeg"></span></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <span>Table image <small style="color:var(--dim)">(how they see you)</small></span><span id="imgSeg"></span></div>
@@ -4166,6 +4314,8 @@ $('#setBtn').onclick=()=>{
   seg('#spdSeg',[['Slow',0.6],['Normal',1],['Fast',1.8]],ST.speed,v=>ST.speed=+v);
   seg('#coachSeg',[['On',true],['Off',false]],ST.coach,v=>ST.coach=(v==='true'));
   seg('#hudSeg',[['On',true],['Off',false]],ST.hud,v=>ST.hud=(v==='true'));
+  seg('#sndSeg',[['On',true],['Off',false]],ST.sound,v=>{ST.sound=(v==='true'); if(ST.sound){SFX.unlock();SFX.play('ok');}});
+  seg('#motSeg',[['On',true],['Off',false]],ST.motion,v=>ST.motion=(v==='true'));
   seg('#liveSeg',[['On',true],['Off',false]],ST.live,v=>ST.live=(v==='true'));
   seg('#imgSeg',[['On',true],['Off',false]],ST.image,v=>ST.image=(v==='true'));
   seg('#timeSeg',[['On',true],['Off',false]],ST.timing,v=>ST.timing=(v==='true'));
@@ -4507,6 +4657,84 @@ function askRead(seat){
 }
 
 /* =====================================================================
+   SOUND — every effect is generated, not loaded, so the app stays one
+   self-contained file. Nothing plays until the player presses TAKE A SEAT,
+   because browsers block audio before a gesture (and because a page that
+   makes noise before you touch it is obnoxious).
+   ===================================================================== */
+const SFX = (() => {
+  let ctx = null, master = null;
+  function ready(){
+    if(ctx) return ctx;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return null;
+    ctx = new AC();
+    master = ctx.createGain();
+    master.gain.value = 0.28;
+    master.connect(ctx.destination);
+    return ctx;
+  }
+  function unlock(){ const c=ready(); if(c && c.state==='suspended') c.resume(); }
+  const on = () => ST.sound !== false;
+
+  /* one voice: an oscillator with a shaped envelope */
+  function tone(freq, t0, dur, type, vol, glideTo){
+    const c = ready(); if(!c) return;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, t0);
+    if(glideTo) o.frequency.exponentialRampToValueAtTime(Math.max(1,glideTo), t0+dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, vol==null?0.5:vol), t0+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+    o.connect(g); g.connect(master);
+    o.start(t0); o.stop(t0+dur+0.02);
+  }
+  /* filtered noise: chips, cards, shuffles */
+  function noise(t0, dur, freq, q, vol){
+    const c = ready(); if(!c) return;
+    const n = Math.floor(c.sampleRate * dur);
+    const buf = c.createBuffer(1, n, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i=0;i<n;i++) d[i] = (Math.random()*2-1) * (1 - i/n);
+    const src = c.createBufferSource(); src.buffer = buf;
+    const bp = c.createBiquadFilter(); bp.type='bandpass';
+    bp.frequency.value = freq || 2400; bp.Q.value = q || 1.2;
+    const g = c.createGain(); g.gain.value = vol==null?0.5:vol;
+    src.connect(bp); bp.connect(g); g.connect(master);
+    src.start(t0); src.stop(t0+dur);
+  }
+  function play(name){
+    if(!on()) return;
+    const c = ready(); if(!c) return;
+    if(c.state === 'suspended') c.resume();
+    const t = c.currentTime;
+    switch(name){
+      case 'card':    noise(t, 0.09, 3200, 0.9, 0.30); break;
+      case 'chip':    noise(t, 0.05, 5200, 3.0, 0.34);
+                      noise(t+0.035, 0.05, 4200, 3.0, 0.22); break;
+      case 'check':   tone(320, t, 0.09, 'sine', 0.28); break;
+      case 'fold':    noise(t, 0.13, 1100, 0.7, 0.22); break;
+      case 'ok':      tone(660, t, 0.09, 'triangle', 0.34);
+                      tone(990, t+0.055, 0.13, 'triangle', 0.30); break;
+      case 'wrong':   tone(200, t, 0.16, 'sawtooth', 0.20, 120); break;
+      case 'pot':     [523,659,784].forEach((f,i)=>tone(f, t+i*0.055, 0.22, 'triangle', 0.30));
+                      noise(t+0.02, 0.16, 4800, 2.4, 0.22); break;
+      case 'pass':    /* a real fanfare: major arpeggio with a lift at the end */
+                      [523,659,784,1046].forEach((f,i)=>tone(f, t+i*0.09, 0.34, 'triangle', 0.34));
+                      tone(1318, t+0.40, 0.55, 'sine', 0.26);
+                      noise(t+0.40, 0.30, 5200, 1.6, 0.14); break;
+      case 'fail':    [392,330,262].forEach((f,i)=>tone(f, t+i*0.11, 0.30, 'sine', 0.28)); break;
+      case 'rank':    [523,659,784,1046,1318].forEach((f,i)=>tone(f, t+i*0.075, 0.42, 'triangle', 0.32));
+                      tone(1568, t+0.42, 0.75, 'sine', 0.28);
+                      noise(t+0.42, 0.45, 6000, 1.2, 0.16); break;
+      case 'tick':    tone(880, t, 0.04, 'square', 0.14); break;
+    }
+  }
+  return {play, unlock, ready:()=>!!ctx};
+})();
+
+/* =====================================================================
    ANALYTICS
    The only question worth answering right now is whether people come back
    and how far they get. So this sends a small number of deliberate events
@@ -4621,6 +4849,7 @@ document.addEventListener('visibilitychange', ()=>{
 
 /* ---------- boot ---------- */
 $('#introGo').onclick=()=>{
+  SFX.unlock(); SFX.play('card');
   TRACK.track('intro_done', {});
   const ip=$('#intro'); ip.classList.add('leaving'); setTimeout(()=>ip.remove(),500);
 };
