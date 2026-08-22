@@ -496,7 +496,7 @@ footer .mark{font-family:'Limelight',cursive;font-size:16px;color:var(--brass);l
 (function(){
   "use strict";
   var ANALYTICS_KEY  = "";                              /* paste the project key to switch on */
-  var ANALYTICS_HOST = "https://eu.i.posthog.com";
+  var ANALYTICS_HOST = "https://us.i.posthog.com";   /* must match your project region */
   var dnt = navigator.doNotTrack === "1" || window.doNotTrack === "1" ||
             navigator.msDoNotTrack === "1";
   if (!ANALYTICS_KEY || dnt) return;
