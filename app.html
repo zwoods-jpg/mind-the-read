@@ -7,6 +7,14 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Mind The Read">
+<script>
+if('serviceWorker' in navigator &&
+   (location.protocol==='https:' || location.hostname==='localhost')){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('./sw.js').catch(function(){ /* offline support is optional */ });
+  });
+}
+</script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Limelight&family=Archivo:wght@400;500;600;700;800&display=swap">
 <style>
 :root{
@@ -251,6 +259,28 @@ nav{display:flex;gap:6px;flex-wrap:wrap;padding:6px 0 16px;align-items:center}
 .streak{display:inline-block;font-size:12px;letter-spacing:.05em;color:var(--brass-hi);
   border:1px solid var(--brass);border-radius:99px;padding:3px 10px;margin-bottom:10px}
 
+/* ---------- session debrief ---------- */
+.deb-head{font-family:'Limelight',cursive;font-size:clamp(22px,4.4vw,30px);color:var(--brass-hi);
+  line-height:1.15;margin-bottom:4px}
+.deb-sub{font-size:13px;color:var(--dim);margin-bottom:16px}
+.deb-grade{display:flex;align-items:center;gap:14px;margin:0 0 16px;flex-wrap:wrap}
+.deb-score{font-family:'Limelight',cursive;font-size:44px;line-height:1;min-width:66px;text-align:center}
+.deb-score.a{color:var(--good)} .deb-score.b{color:var(--brass-hi)}
+.deb-score.c{color:#D8B45A} .deb-score.d{color:var(--bad)}
+.deb-verdict{flex:1;min-width:210px;font-size:15.5px;line-height:1.55}
+.deb-sec{border-top:1px solid var(--line);padding:14px 0 2px}
+.deb-sec h4{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--brass);margin:0 0 7px}
+.deb-sec p{margin:0 0 10px;font-size:14.5px;line-height:1.6;color:#CFD6D1}
+.deb-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:9px;margin:4px 0 12px}
+.deb-num{border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:rgba(0,0,0,.18)}
+.deb-num b{display:block;font-size:19px;color:var(--bone);font-variant-numeric:tabular-nums}
+.deb-num span{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+.deb-focus{border:1px solid var(--brass);border-radius:11px;padding:14px;margin-top:6px;
+  background:linear-gradient(180deg,rgba(200,145,47,.13),rgba(200,145,47,.03))}
+.deb-focus h4{color:var(--brass-hi)}
+.deb-caveat{font-size:12.5px;color:var(--dim);line-height:1.55;margin-top:14px;
+  border-top:1px solid var(--line);padding-top:12px}
+
 /* micro-feedback on drill answers */
 @keyframes pulseGood{0%{transform:none}45%{transform:scale(1.07)}100%{transform:none}}
 @keyframes nudgeBad{0%,100%{transform:none}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
@@ -490,6 +520,7 @@ footer{margin-top:26px;text-align:center;font-size:12px;color:var(--dim);opacity
     </div>
     <div class="actbar" id="nextBar" style="display:none">
       <button class="abtn gold" id="bNext">Next hand</button>
+      <button class="abtn quiet" id="bEndSession">End session</button>
     </div>
     <div class="actbar" id="startBar">
       <button class="abtn gold" id="bStart">Deal in</button>
@@ -543,6 +574,7 @@ footer{margin-top:26px;text-align:center;font-size:12px;color:var(--dim);opacity
   <div class="card-panel">
     <div id="statGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:13px"></div>
     <div style="display:flex;justify-content:center;margin-top:20px">
+      <button class="abtn quiet" id="sessionBtn" style="margin-right:8px">Last session</button>
       <button class="abtn gold" id="leakBtn" style="margin-right:8px">See my leaks &amp; tilt</button>
       <button class="abtn quiet sm" id="resetStats">Reset stats…</button>
     </div>
@@ -3014,11 +3046,19 @@ $('#bStart').onclick = async ()=>{
   const greet=regGreeting();
   if(greet) toast(greet.replace(/<[^>]+>/g,''));
   $('#startBar').style.display='none';
+  saveSessionSnapshot();   /* a session left running is still a session that ended */
   sessionPre=[0,0]; sessionPost=[0,0]; sessionReads=[0,0]; sessionHands=0; STATS.sessions++;
   sessionReset(); brainReset(ST.brain===false?0:3);
   trackSessionStart();
   TRACK.track('play_start', {seats:G.seats.length, live:!!ST.live, stack_bb:ST.stackBB||100});
   await runHand();
+};
+$('#bEndSession').onclick = ()=>{
+  trackSessionEnd('ended');
+  saveSessionSnapshot();
+  openSessionReport();
+  $('#nextBar').style.display='none';
+  $('#startBar').style.display='flex';
 };
 $('#bNext').onclick = async ()=>{
   $('#nextBar').style.display='none';
@@ -3815,6 +3855,205 @@ function burst(kind){
   requestAnimationFrame(frame);
 }
 
+/* =====================================================================
+   SESSION DEBRIEF — what just happened, in words.
+   The Stats screen answers "what kind of player am I". This answers
+   "how did that sitting go, and what should I work on next" — which is a
+   different and more useful question straight after playing.
+   Every number here is a decision count, never a result: you can run
+   terribly and still get told you played well, which is the point.
+   ===================================================================== */
+function sessionReport(){
+  const H = G.heroStats || {};
+  const hands = SESSION.hands || 0;
+  const pre  = sessionPre[1]  ? sessionPre[0]/sessionPre[1]   : null;
+  const post = sessionPost[1] ? sessionPost[0]/sessionPost[1] : null;
+  const f2b  = H.faced >= 4 ? H.folds/H.faced : null;
+  const aggr = H.post  >= 6 ? H.aggr/H.post   : null;
+  const bb   = G.bb || 20;
+  const lostBB = SESSION.evLost/bb;
+  const per100 = hands ? lostBB*100/hands : 0;
+
+  /* a grade from graded DECISIONS only — never from chips won */
+  let score = null, grade = '—', gcls = 'c';
+  const parts = [];
+  if(pre  != null) parts.push({w: sessionPre[1],  v: pre});
+  if(post != null) parts.push({w: sessionPost[1]*1.4, v: post});   /* reads count for more */
+  if(parts.length){
+    const wsum = parts.reduce((a,x)=>a+x.w,0);
+    score = parts.reduce((a,x)=>a+x.v*x.w,0)/wsum;
+    grade = score>=0.88?'A' : score>=0.78?'B' : score>=0.65?'C' : score>=0.5?'D' : 'E';
+    gcls  = score>=0.88?'a' : score>=0.78?'b' : score>=0.65?'c' : 'd';
+  }
+
+  /* the single most expensive decision of the sitting, if there was one */
+  let worst = null;
+  HIST.forEach((hd,i)=>{
+    (hd.decisions||[]).forEach(d=>{
+      if(!d.ok && d.evLost>0 && (!worst || d.evLost>worst.evLost))
+        worst = {evLost:d.evLost, kind:d.kind, took:d.took, best:d.best,
+                 why:d.why, villain:d.villain, handIdx:i, street:d.street};
+    });
+  });
+
+  /* what to work on: the weakest thing with enough evidence to name */
+  const cands = [];
+  if(pre  != null && sessionPre[1]  >= 5) cands.push({k:'pre',  gap:0.85-pre,  n:sessionPre[1]});
+  if(post != null && sessionPost[1] >= 4) cands.push({k:'post', gap:0.75-post, n:sessionPost[1]});
+  if(f2b  != null && H.faced >= 6){
+    if(f2b > 0.70) cands.push({k:'foldy',  gap:f2b-0.70, n:H.faced});
+    if(f2b < 0.25) cands.push({k:'sticky', gap:0.25-f2b, n:H.faced});
+  }
+  if(aggr != null && aggr < 0.15 && H.post >= 10) cands.push({k:'passive', gap:0.15-aggr, n:H.post});
+  cands.sort((a,b)=>b.gap-a.gap);
+  const focus = cands.length && cands[0].gap > 0 ? cands[0] : null;
+
+  return {hands, pre, post, f2b, aggr, score, grade, gcls, worst, focus,
+          lostBB, per100, net:SESSION.net||0,
+          image: heroImage(),
+          preN:sessionPre[1], postN:sessionPost[1], facedN:H.faced||0,
+          /* a letter grade needs both a real hand count AND enough graded
+             decisions behind it, or it is a confident number built on noise */
+          thin: hands < 15 || (sessionPre[1] + sessionPost[1]) < 10};
+}
+
+const FOCUS_TEXT = {
+  pre:     {t:'Your starting hands',
+            p:'The cheapest money in poker is the money you never put in. Work the opening charts until the answer is automatic — most losing sessions start before the flop.',
+            go:'Drill: Open or fold'},
+  post:    {t:'Reading the bettor',
+            p:'When someone bets, the question is not what you hold — it is what THEY would bet. That is the skill this trainer exists for, and it is the one that separates you from a pot-odds calculator.',
+            go:'Chapter: Exploiting'},
+  foldy:   {t:'You are folding too often',
+            p:'Fold to most bets and observant opponents simply bet at you with nothing. You do not have to call more often with bad hands — you have to call more often with the hands you are already folding.',
+            go:'Level: Do Not Be Readable'},
+  sticky:  {t:'You are calling too often',
+            p:'Curiosity is the most expensive habit in poker. Against players who rarely bluff, every one of those calls pays off a hand that already beat you.',
+            go:'Drill: Bluff or value'},
+  passive: {t:'You are not betting enough',
+            p:'You rarely bet, so opponents take the pot whenever nobody has anything. Betting more often costs little and wins the pots nobody wanted.',
+            go:'Drill: Multiway bluffs'}
+};
+
+/* The report is computed from the LIVE counters, which the next Start wipes.
+   So a finished session is snapshotted here — otherwise "Last session" on the
+   Stats screen has nothing left to describe. The snapshot outlives HIST, so the
+   hand behind "your most expensive decision" is gone and replay is withheld. */
+let LAST_REPORT = null;
+try{ LAST_REPORT = JSON.parse(localStorage.getItem('mtr_lastReport')||'null'); }catch(e){}
+function saveSessionSnapshot(){
+  if(!SESSION.hands) return;
+  const R = sessionReport();
+  R.stale = true;
+  LAST_REPORT = R;
+  try{ localStorage.setItem('mtr_lastReport', JSON.stringify(R)); }catch(e){}
+}
+
+function openSessionReport(snap){
+  const R = snap || sessionReport();
+  if(!R || !R.hands){
+    toast(snap===undefined ? 'Play a few hands first.' : 'No session to look back on yet.');
+    return;
+  }
+  closeSheet();
+  const pct = v => v==null ? '—' : Math.round(v*100)+'%';
+
+  /* the headline: honest about sample size before anything else */
+  let verdict;
+  if(R.score == null)
+    verdict = 'Not enough graded decisions to judge this one. Play hands where you actually face a bet and the coach will have something to work with.';
+  else if(R.thin)
+    verdict = R.score>=0.78
+      ? 'A short sitting, and you played it well. Too few hands to mean much yet, but nothing went wrong.'
+      : 'A short sitting with some loose decisions. Too few hands to draw conclusions from — play a longer one before you worry.';
+  else
+    verdict = R.score>=0.88 ? 'That was a genuinely strong session. Your decisions held up under pressure and you were not readable.'
+            : R.score>=0.78 ? 'A solid session. The fundamentals were there; the money now sits in the closer spots.'
+            : R.score>=0.65 ? 'A mixed session. You know the ideas — you are not applying them consistently yet.'
+            : 'A rough session. The good news is that everything below is fixable and none of it is luck.';
+
+  const wellBits = [];
+  if(R.pre  != null && R.pre  >= 0.85) wellBits.push('your preflop discipline was excellent ('+pct(R.pre)+' against the charts)');
+  else if(R.pre != null && R.pre >= 0.75) wellBits.push('you mostly stuck to sensible opening ranges ('+pct(R.pre)+')');
+  if(R.post != null && R.post >= 0.75) wellBits.push('you read the bettors well ('+pct(R.post)+' of your calls and folds were the most profitable choice)');
+  if(R.f2b  != null && R.f2b > 0.30 && R.f2b < 0.65) wellBits.push('your folding was balanced at '+pct(R.f2b)+', which is hard to exploit');
+  if(R.image && R.image.fam==='reg') wellBits.push('the table could not pin a style on you');
+
+  const costBits = [];
+  if(R.pre  != null && R.pre  < 0.75) costBits.push('preflop accuracy of '+pct(R.pre)+' — that is money given away before a flop was dealt');
+  if(R.post != null && R.post < 0.65) costBits.push('exploit decisions at '+pct(R.post)+', meaning the read was available and not used');
+  if(R.f2b  != null && R.f2b > 0.70) costBits.push('you folded to '+pct(R.f2b)+' of bets, which anyone paying attention will punish');
+  if(R.f2b  != null && R.f2b < 0.25) costBits.push('you folded to only '+pct(R.f2b)+' of bets, so bluffs were never going to get through to you');
+
+  const F = R.focus ? FOCUS_TEXT[R.focus.k] : null;
+
+  const sheet=document.createElement('div'); sheet.className='sheet';
+  sheet.innerHTML=`<div class="sheet-in">
+    <div class="sheet-h">
+      <div>
+        <div class="deb-head">${R.stale?'Your last session':'How that session went'}</div>
+        <div class="deb-sub">${R.hands} hand${R.hands===1?'':'s'} &middot; graded on decisions, never on results</div>
+      </div>
+      <button class="abtn quiet sm" id="dbClose">Close</button>
+    </div>
+
+    <div class="deb-grade">
+      <div class="deb-score ${R.thin?'c':R.gcls}" title="${R.thin?'Too few hands to grade':'Graded on decisions'}">${
+        R.thin ? '&ndash;' : R.grade}</div>
+      <div class="deb-verdict">${verdict}${
+        R.thin && R.score!=null
+          ? ' <small style="display:block;margin-top:6px;color:var(--dim)">No grade for a sitting this short &mdash; the numbers below are still worth a look.</small>'
+          : ''}</div>
+    </div>
+
+    <div class="deb-nums">
+      <div class="deb-num"><b>${pct(R.pre)}</b><span>Preflop${R.preN?' ('+R.preN+')':''}</span></div>
+      <div class="deb-num"><b>${pct(R.post)}</b><span>The read${R.postN?' ('+R.postN+')':''}</span></div>
+      <div class="deb-num"><b>${pct(R.f2b)}</b><span>Fold to bet</span></div>
+      <div class="deb-num"><b>${R.lostBB>0?R.lostBB.toFixed(1)+'bb':'0bb'}</b><span>Given up</span></div>
+    </div>
+
+    ${wellBits.length?`<div class="deb-sec"><h4>What went well</h4><p>${
+      wellBits[0].charAt(0).toUpperCase()+wellBits[0].slice(1)+
+      (wellBits[1]?', and '+wellBits[1]:'')+'.'}</p></div>`:''}
+
+    ${costBits.length?`<div class="deb-sec"><h4>What it cost you</h4><p>${
+      costBits[0].charAt(0).toUpperCase()+costBits[0].slice(1)+
+      (costBits[1]?'. Also, '+costBits[1]:'')+'.'}</p></div>`:''}
+
+    ${R.worst?`<div class="deb-sec"><h4>Your most expensive decision</h4>
+      <p>You ${R.worst.took==='fold'?'folded':R.worst.took==='call'?'called':'bet'} on the ${
+        STREETS[R.worst.street]||'flop'}${R.worst.villain?' against '+R.worst.villain:''}, where ${
+        R.worst.best==='call'?'calling':'folding'} was worth about <b>${(R.worst.evLost/(G.bb||20)).toFixed(1)}bb</b> more.
+        One hand is not a verdict, but this is the shape of decision to look at.</p>
+      ${R.stale?'':'<button class="abtn quiet sm" id="dbReplay">Replay that hand</button>'}</div>`:''}
+
+    ${R.image?`<div class="deb-sec"><h4>How the table saw you</h4>
+      <p>By the end they had you as <b>${R.image.label}</b> &mdash; ${R.image.vpip}% of hands played, ${
+        R.image.pfr}% raised${R.image.f2b!=null?', folding to '+R.image.f2b+'% of bets':''}. ${R.image.expects}</p></div>`:''}
+
+    ${F?`<div class="deb-focus"><h4>Work on this next</h4>
+      <p style="color:var(--bone)"><b>${F.t}.</b> ${F.p}</p>
+      <p style="margin:0;color:var(--brass-hi);font-size:13.5px">${F.go}</p></div>`:''}
+
+    <div class="deb-caveat">${
+      R.thin
+        ? 'A dozen hands is a snapshot, not a measurement &mdash; poker is noisy enough that a short sitting says very little. Treat everything above as a prompt to look at, not a conclusion.'
+        : 'These figures describe your decisions, not your luck. You can play a flawless session and still lose every pot, which is why nothing here counts chips.'
+    } The "given up" figure is measured on the flop and turn as though the hand ended there, so it understates rather than overstates.</div>
+  </div>`;
+  document.body.appendChild(sheet);
+  sheet.onclick = e => { if(e.target===sheet) closeSheet(); };
+  $('#dbClose').onclick = closeSheet;
+  const rp=$('#dbReplay');
+  /* a snapshot outlives the HIST it indexes into, so never replay from one */
+  if(rp && R.worst && !R.stale) rp.onclick = ()=>{ closeSheet(); openReplayer(R.worst.handIdx); };
+  TRACK.track('session_report', {hands:R.hands, grade:R.grade,
+    preflop_pct:R.pre==null?null:Math.round(R.pre*100),
+    exploit_pct:R.post==null?null:Math.round(R.post*100),
+    focus:R.focus?R.focus.k:null});
+}
+
 /* ---------- what happens when a level ends ----------
    Previously this fired a toast and tried to bounce you back to the campaign
    screen — but only from the play pane, so finishing a DRILL level left you
@@ -4177,6 +4416,10 @@ function renderStats(){
      <div class="lvgoal">open/fold ${pct(d.open[0],d.open[1])} · outs ${pct(d.outs[0],d.outs[1])}</div></div>`;
 }
 $('#leakBtn').onclick=()=>{ TRACK.track('leak_report_opened', {cleared:levelsCleared()}); openLeakReport(); };
+$('#sessionBtn').onclick=()=>{
+  if(SESSION.hands) openSessionReport();        /* a sitting in progress */
+  else openSessionReport(LAST_REPORT);          /* the one just finished */
+};
 $('#resetStats').onclick=()=>{
   const sc=document.createElement('div');
   sc.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;display:flex;align-items:center;justify-content:center;padding:16px';
@@ -4856,12 +5099,4 @@ $('#introGo').onclick=()=>{
 seatTable(ST.seats); buildSeatEls(); renderAll();
 renderCampaign(); setTrigger('camp');
 TRACK.start();
-</script>
-<script>
-if('serviceWorker' in navigator &&
-   (location.protocol==='https:' || location.hostname==='localhost')){
-  window.addEventListener('load', function(){
-    navigator.serviceWorker.register('./sw.js').catch(function(){ /* offline support is optional */ });
-  });
-}
 </script>
